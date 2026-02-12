@@ -15,7 +15,7 @@ import {
   useHandleConnections,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield } from 'lucide-react';
 import './App.css';
 
 // 自定義連線組件 (帶有刪除按鈕)
@@ -409,21 +409,174 @@ function App() {
 
       <main className="game-main">
         <aside className="tool-panel">
-          <h3>基礎設施工具</h3>
-          <div className="tool-list">
-            <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000 })}>
-              <Plus size={14} /> 伺服器 (1k QPS)
-            </button>
-            <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
-              <Plus size={14} /> 負載平衡器
-            </button>
-            <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500 })}>
-              <Plus size={14} /> 資料庫
-            </button>
-            <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 10000 })}>
-              <Plus size={14} /> Redis 快取
-            </button>
-          </div>
+          {nodes.find(n => n.selected) ? (
+            <div className="property-editor">
+              <h3>組件設定</h3>
+              {(() => {
+                const selectedNode = nodes.find(n => n.selected);
+                return (
+                  <div className="props-form">
+                    <div className="prop-group">
+                      <label>名稱</label>
+                      <input
+                        type="text"
+                        value={selectedNode.data.label}
+                        onChange={(e) => {
+                          setNodes(nds => nds.map(n => {
+                            if (n.id === selectedNode.id) {
+                              return { ...n, data: { ...n.data, label: e.target.value } };
+                            }
+                            return n;
+                          }));
+                        }}
+                      />
+                    </div>
+                    {selectedNode.data.properties?.max_qps !== undefined && (
+                      <div className="prop-group">
+                        <label>處理能力 (Max QPS)</label>
+                        <input
+                          type="number"
+                          value={selectedNode.data.properties.max_qps}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 0;
+                            setNodes(nds => nds.map(n => {
+                              if (n.id === selectedNode.id) {
+                                return {
+                                  ...n,
+                                  data: {
+                                    ...n.data,
+                                    properties: { ...n.data.properties, max_qps: val }
+                                  }
+                                };
+                              }
+                              return n;
+                            }));
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {/* Auto Scaling Logic for Web Server */}
+                    {selectedNode.data.type === 'WEB_SERVER' && (
+                      <>
+                        <div className="prop-group checkbox">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={selectedNode.data.properties.auto_scaling || false}
+                              onChange={(e) => {
+                                setNodes(nds => nds.map(n => {
+                                  if (n.id === selectedNode.id) {
+                                    return {
+                                      ...n,
+                                      data: {
+                                        ...n.data,
+                                        properties: { ...n.data.properties, auto_scaling: e.target.checked }
+                                      }
+                                    };
+                                  }
+                                  return n;
+                                }));
+                              }}
+                            />
+                            啟用 Auto Scaling
+                          </label>
+                        </div>
+                        {selectedNode.data.properties.auto_scaling && (
+                          <div className="prop-group">
+                            <label>最大副本數 (Max Replicas)</label>
+                            <input
+                              type="number"
+                              value={selectedNode.data.properties.max_replicas || 5}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 1;
+                                setNodes(nds => nds.map(n => {
+                                  if (n.id === selectedNode.id) {
+                                    return {
+                                      ...n,
+                                      data: {
+                                        ...n.data,
+                                        properties: { ...n.data.properties, max_replicas: val }
+                                      }
+                                    };
+                                  }
+                                  return n;
+                                }));
+                              }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+
+                    {/* Burst Traffic Logic for Traffic Source */}
+                    {selectedNode.data.type === 'TRAFFIC_SOURCE' && (
+                      <div className="prop-group checkbox">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={selectedNode.data.properties.burst_traffic || false}
+                            onChange={(e) => {
+                              setNodes(nds => nds.map(n => {
+                                if (n.id === selectedNode.id) {
+                                  return {
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      properties: { ...n.data.properties, burst_traffic: e.target.checked }
+                                    }
+                                  };
+                                }
+                                return n;
+                              }));
+                            }}
+                          />
+                          啟用突發流量 (Simulate Spikes)
+                        </label>
+                      </div>
+                    )}
+
+                    <button className="btn-secondary" onClick={() => setNodes(nds => nds.map(n => ({ ...n, selected: false })))}>
+                      關閉設定
+                    </button>
+                    <div className="help-text">
+                      {selectedNode.data.type === 'MESSAGE_QUEUE' && "提示：調整 QPS 來控制給下游的流量速度 (削峰填谷)。"}
+                      {selectedNode.data.type === 'WEB_SERVER' && "提示：單機 QPS 上限，超過會導致崩潰或延遲。"}
+                      {selectedNode.data.type === 'CDN' && "提示：CDN 可快取靜態資源，大幅降低 Origin 負載 (約 80%)。"}
+                      {selectedNode.data.type === 'WAF' && "提示：WAF 用於過濾惡意流量，保護後端安全。"}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : (
+            <>
+              <h3>基礎設施工具</h3>
+              <div className="tool-list">
+                <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, auto_scaling: false, max_replicas: 5 })}>
+                  <Plus size={14} /> 伺服器 (1k QPS)
+                </button>
+                <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
+                  <Plus size={14} /> 負載平衡器
+                </button>
+                <button onClick={() => addComponent('CDN', 'CDN (全球快取)', Globe, { max_qps: 50000 })}>
+                  <Plus size={14} /> CDN (內容傳遞網路)
+                </button>
+                <button onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}>
+                  <Plus size={14} /> WAF (防火牆)
+                </button>
+                <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500 })}>
+                  <Plus size={14} /> 資料庫
+                </button>
+                <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 10000 })}>
+                  <Plus size={14} /> Redis 快取
+                </button>
+                <button onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 5000 })}>
+                  <Plus size={14} /> 訊息佇列 (MQ)
+                </button>
+              </div>
+            </>
+          )}
 
           {evaluationResult && (
             <div className="eval-details">

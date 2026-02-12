@@ -60,6 +60,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			} else if v, ok := comp.Properties["start_qps"].(int64); ok {
 				baseQPS = v
 			}
+			
+			// 處理突發流量 (Burst)
+			if burst, ok := comp.Properties["burst_traffic"].(bool); ok && burst {
+				// 每 15 秒會有一次 5 倍流量的突發，持續 3 秒
+				if elapsedSeconds%15 < 3 {
+					baseQPS *= 5
+				}
+			}
 		}
 	}
 
@@ -85,6 +93,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	visited := make(map[string]bool)
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
+	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
 
 	serverCount := int64(0)
 	for _, c := range d.Components {
@@ -94,50 +103,50 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
-    // 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
-    // 目的：讓每個節點知道自己「將會」收到多少流量
+	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
+	// 目的：讓每個節點知道自己「將會」收到多少流量
 	passesInputLoad := make(map[string]int64)
 	
 	var calculateLoad func(string, int64, map[string]bool)
 	calculateLoad = func(id string, input int64, pathVisited map[string]bool) {
 		if _, exists := compMap[id]; !exists {
-            return
-        }
-        if pathVisited[id] {
-            return
-        }
-        newPathVisited := make(map[string]bool)
-        for k, v := range pathVisited {
-            newPathVisited[k] = v
-        }
-        newPathVisited[id] = true
+			return
+		}
+		if pathVisited[id] {
+			return
+		}
+		newPathVisited := make(map[string]bool)
+		for k, v := range pathVisited {
+			newPathVisited[k] = v
+		}
+		newPathVisited[id] = true
 
-        passesInputLoad[id] += input
+		passesInputLoad[id] += input
 
-        // 簡單分流預算傳遞
-        downstreamCount := int64(len(adj[id]))
-        if downstreamCount > 0 {
-            // Cache 邏輯在預算階段也要考慮嗎？
-            // 是的，因為 Cache 會減少往下游的「需求」。
+		// 簡單分流預算傳遞
+		downstreamCount := int64(len(adj[id]))
+		if downstreamCount > 0 {
+			// Cache 邏輯在預算階段也要考慮嗎？
+			// 是的，因為 Cache 會減少往下游的「需求」。
 			comp := compMap[id]
 			output := input
-            if comp.Type == component.Cache {
-                output = int64(float64(input) * 0.2)
-            }
-            
-            split := output / downstreamCount
-            for _, nextID := range adj[id] {
-                calculateLoad(nextID, split, newPathVisited)
-            }
-        }
+			if comp.Type == component.Cache || comp.Type == component.CDN {
+				output = int64(float64(input) * 0.2)
+			}
+			
+			split := output / downstreamCount
+			for _, nextID := range adj[id] {
+				calculateLoad(nextID, split, newPathVisited)
+			}
+		}
 	}
 
-    for _, root := range roots {
-        // 初始流量也需要分流 logic? 
-        // 假設 TrafficSource 本身不消耗，直接往下傳
-        // 為了對齊，我們把 TrafficSource 當作一個透明節點
+	for _, root := range roots {
+		// 初始流量也需要分流 logic? 
+		// 假設 TrafficSource 本身不消耗，直接往下傳
+		// 為了對齊，我們把 TrafficSource 當作一個透明節點
 		calculateLoad(root, currentQPS, make(map[string]bool))
-    }
+	}
 
 
 	// Pass 2: 實際流量傳播 (Actual Flow Propagation)
@@ -164,12 +173,36 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			return
 		}
 
-		maxQPS := getCompMaxQPS(comp)
-		
+		baseMaxQPS := getCompMaxQPS(comp)
+		currentMaxQPS := baseMaxQPS
+
 		// 這裡使用 Pass 1 計算出的 "潛在總流量" 來判斷是否崩潰
-        // 因為崩潰是看「嘗試打進來的量」，而不是「成功擠進來的量」
+		// 因為崩潰是看「嘗試打進來的量」，而不是「成功擠進來的量」
 		potentialTotalLoad := passesInputLoad[id]
-        compLoads[id] = potentialTotalLoad // 前端顯示的是「嘗試請求量」
+		compLoads[id] = potentialTotalLoad // 前端顯示的是「嘗試請求量」
+
+		// Auto Scaling Logic
+		if comp.Type == component.WebServer {
+			if auto, ok := comp.Properties["auto_scaling"].(bool); ok && auto {
+				maxReplicas := 5
+				if v, ok := comp.Properties["max_replicas"].(float64); ok {
+					maxReplicas = int(v)
+				} else if v, ok := comp.Properties["max_replicas"].(int64); ok {
+					maxReplicas = int(v)
+				}
+
+				needed := float64(potentialTotalLoad) / float64(baseMaxQPS)
+				replicas := int(math.Ceil(needed))
+				if replicas > maxReplicas {
+					replicas = maxReplicas
+				}
+				if replicas < 1 {
+					replicas = 1
+				}
+				currentMaxQPS = baseMaxQPS * int64(replicas)
+			}
+		}
+		compEffectiveMaxQPS[id] = currentMaxQPS
 
 		// 判斷崩潰
 		isGracePeriod := false
@@ -183,30 +216,38 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 
-		if !isGracePeriod && maxQPS > 0 && potentialTotalLoad > int64(float64(maxQPS)*1.5) {
+		// 崩潰閾值設定
+		crashThreshold := 1.5
+		if comp.Type == component.MessageQueue {
+			crashThreshold = 50.0 // MQ 非常難以崩潰 (模擬高吞吐緩衝)
+		} else if comp.Type == component.LoadBalancer || comp.Type == component.CDN || comp.Type == component.WAF {
+			crashThreshold = 5.0 // Infra 組件相對耐用
+		}
+
+		if !isGracePeriod && currentMaxQPS > 0 && potentialTotalLoad > int64(float64(currentMaxQPS)*crashThreshold) {
 			crashedNodes[id] = true
 			return // 崩潰，流量在此斷掉
 		}
 
 		visited[id] = true
 		
-        // 截斷邏輯 (Capping)
-        // 我們當前收到的是 input。
-        // 我們知道這個節點總共收到了 potentialTotalLoad。
-        // 如果 potentialTotalLoad > maxQPS，則每個來源的流量都應該被等比例縮減 (Throttling)
-        // 縮減比例 factor = maxQPS / potentialTotalLoad
-        // 實際處理流量 = input * factor
-        
-        actualProcessed := input
-        if maxQPS > 0 && potentialTotalLoad > maxQPS {
-            factor := float64(maxQPS) / float64(potentialTotalLoad)
-            actualProcessed = int64(float64(input) * factor)
-        }
-        
+		// 截斷邏輯 (Capping)
+		// 這裡我們當前收到的是 input。
+		// 我們知道這個節點總共收到了 potentialTotalLoad。
+		// 如果 potentialTotalLoad > maxQPS，則每個來源的流量都應該被等比例縮減 (Throttling)
+		// 縮減比例 factor = maxQPS / potentialTotalLoad
+		// 實際處理流量 = input * factor
+		
+		actualProcessed := input
+		if currentMaxQPS > 0 && potentialTotalLoad > currentMaxQPS {
+			factor := float64(currentMaxQPS) / float64(potentialTotalLoad)
+			actualProcessed = int64(float64(input) * factor)
+		}
+		
 		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
 
 		outputQPS := actualProcessed
-		if comp.Type == component.Cache {
+		if comp.Type == component.Cache || comp.Type == component.CDN {
 			outputQPS = int64(float64(actualProcessed) * 0.2)
 		}
 
@@ -221,28 +262,37 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	for _, root := range roots {
 		// Traffic Source 不受 MaxQPS 限制，也不會崩潰
-        // 直接傳遞完整流量
-        // 但我們還是要呼叫 propagateFlow 來觸發下游
-        // 這裡我們直接模擬分流傳給下游，避免 TrafficSource 本身被判定崩潰
-        // 或者簡單點：TrafficSource 的 maxQPS 是無限大
-        compLoads[root] = currentQPS
-        visited[root] = true
-        
+		// 直接傳遞完整流量
+		// 但我們還是要呼叫 propagateFlow 來觸發下游
+		// 這裡我們直接模擬分流傳給下游，避免 TrafficSource 本身被判定崩潰
+		// 或者簡單點：TrafficSource 的 maxQPS 是無限大
+		compLoads[root] = currentQPS
+		visited[root] = true
+		
 		downstreamCount := int64(len(adj[root]))
-        if downstreamCount > 0 {
-            split := currentQPS / downstreamCount
-            for _, nextID := range adj[root] {
-                propagateFlow(nextID, split, make(map[string]bool))
-            }
-        }
+		if downstreamCount > 0 {
+			split := currentQPS / downstreamCount
+			for _, nextID := range adj[root] {
+				propagateFlow(nextID, split, make(map[string]bool))
+			}
+		}
 	}
 
 	// 5. 計算總體健康度 (以最終成功到達所有終點的流量比例來計算)
 	// 重新計算有效容量以評估指標
 	var serverCapacity int64
+	hasCDN := false
 	for id, comp := range compMap {
 		if comp.Type == component.WebServer && visited[id] {
-			serverCapacity += getCompMaxQPS(comp)
+			// 使用有效處理能力 (包含 Auto Scaling)
+			if cap, ok := compEffectiveMaxQPS[id]; ok {
+				serverCapacity += cap
+			} else {
+				serverCapacity += getCompMaxQPS(comp)
+			}
+		}
+		if comp.Type == component.CDN && visited[id] {
+			hasCDN = true
 		}
 	}
 	var dbCapacity int64
@@ -260,8 +310,13 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	if hasCache {
 		effectiveDBCapacity = dbCapacity * 5
 	}
+	
+	effectiveServerCapacity := serverCapacity
+	if hasCDN {
+		effectiveServerCapacity = serverCapacity * 5 // CDN 承擔 80% 流量
+	}
 
-	systemCapacity := serverCapacity
+	systemCapacity := effectiveServerCapacity
 	if dbCapacity > 0 && effectiveDBCapacity < systemCapacity {
 		systemCapacity = effectiveDBCapacity
 	}
@@ -277,7 +332,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	// 延遲模擬
 	congestionFactor := 1.0
 	for id, load := range compLoads {
-		maxQPS := getCompMaxQPS(compMap[id])
+		maxQPS := compEffectiveMaxQPS[id] // 使用有效最大 QPS
+		if maxQPS == 0 {
+			maxQPS = getCompMaxQPS(compMap[id])
+		}
+		
 		if maxQPS > 0 {
 			utilization := float64(load) / float64(maxQPS)
 			if utilization > 0.8 {

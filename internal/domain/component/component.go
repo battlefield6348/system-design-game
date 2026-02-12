@@ -10,6 +10,8 @@ const (
 	Database      Type = "DATABASE"
 	Cache         Type = "CACHE"
 	MessageQueue  Type = "MESSAGE_QUEUE"
+	CDN           Type = "CDN"
+	WAF           Type = "WAF"
 )
 
 // Component 代表系統中的一個最小單位
