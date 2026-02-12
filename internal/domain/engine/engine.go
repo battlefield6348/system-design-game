@@ -125,6 +125,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		compReplicas[c.ID] = 1
 	}
 
+	var totalFulfilledQPS int64
+
 	// Pass 1: 計算潛在總負載 (Potential Load)
 	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
 	// 目的：讓每個節點知道自己「將會」收到多少流量
@@ -277,6 +279,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			outputQPS = int64(float64(actualProcessed) * 0.2)
 		}
 
+		// 計算「成功取得資料」的量 (Data Fulfillment)
+		fulfilled := int64(0)
+		if comp.Type == component.Cache || comp.Type == component.CDN {
+			// 快取命中的部分算成功
+			fulfilled = actualProcessed - outputQPS
+		} else if comp.Type == component.Database || comp.Type == component.ObjectStorage || comp.Type == component.SearchEngine {
+			// 直接抵達資料庫或儲存層算成功
+			fulfilled = actualProcessed
+		}
+		totalFulfilledQPS += fulfilled
+
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
 			splitQPS := outputQPS / downstreamCount
@@ -319,65 +332,24 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	// 5. 計算總體健康度 (以最終成功到達所有終點的流量比例來計算)
-	// 重新計算有效容量以評估指標
-	var serverCapacity int64
-	hasCDN := false
-	for id, comp := range compMap {
-		if comp.Type == component.WebServer && visited[id] {
-			// 使用有效處理能力 (包含 Auto Scaling)
-			if cap, ok := compEffectiveMaxQPS[id]; ok {
-				serverCapacity += cap
-			} else {
-				serverCapacity += getCompMaxQPS(comp)
-			}
-		}
-		if comp.Type == component.CDN && visited[id] {
-			hasCDN = true
-		}
-	}
-	var dbCapacity int64
-	hasCache := false
-	for id, comp := range compMap {
-		if comp.Type == component.Database && visited[id] {
-			dbCapacity += getCompMaxQPS(comp)
-		}
-		if comp.Type == component.Cache && visited[id] {
-			hasCache = true
+	// 5. 綜合評估 (以資料獲取成功率為核心)
+	successRate := 0.0
+	if currentQPS > 0 {
+		successRate = float64(totalFulfilledQPS) / float64(currentQPS)
+		if successRate > 1.0 {
+			successRate = 1.0
 		}
 	}
 
-	effectiveDBCapacity := dbCapacity
-	if hasCache {
-		effectiveDBCapacity = dbCapacity * 5
-	}
-	
-	effectiveServerCapacity := serverCapacity
-	if hasCDN {
-		effectiveServerCapacity = serverCapacity * 5 // CDN 承擔 80% 流量
-	}
-
-	systemCapacity := effectiveServerCapacity
-	if dbCapacity > 0 && effectiveDBCapacity < systemCapacity {
-		systemCapacity = effectiveDBCapacity
-	}
-
-	errorRate := 0.0
-	if currentQPS > systemCapacity && systemCapacity > 0 {
-		errorRate = float64(currentQPS-systemCapacity) / float64(currentQPS)
-	} else if systemCapacity == 0 && currentQPS > 0 {
-		errorRate = 1.0
-	}
-	health := (1.0 - errorRate) * 100.0
+	totalScore := successRate * 100.0
 
 	// 延遲模擬
 	congestionFactor := 1.0
 	for id, load := range compLoads {
-		maxQPS := compEffectiveMaxQPS[id] // 使用有效最大 QPS
+		maxQPS := compEffectiveMaxQPS[id]
 		if maxQPS == 0 {
 			maxQPS = getCompMaxQPS(compMap[id])
 		}
-		
 		if maxQPS > 0 {
 			utilization := float64(load) / float64(maxQPS)
 			if utilization > 0.8 {
@@ -393,8 +365,15 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		avgLatency = 2000
 	}
 
+	comment := "系統穩定運行中。"
+	if successRate < 0.1 {
+		comment = "警告：使用者幾乎拿不到資料，請檢查伺服器與資料庫連線！"
+	} else if successRate < 0.95 {
+		comment = "提示：部分請求失敗，建議優化架構或增加容量。"
+	}
+
 	scores := []evaluation.Score{
-		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("健康度: %.1f%% (系統容量 %d QPS)", health, systemCapacity)},
+		{Dimension: "Data Success", Value: totalScore, Comment: comment},
 		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-50)/10), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
 	}
 
@@ -409,12 +388,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	return &evaluation.Result{
 		DesignID:            designID,
-		ScenarioID:          s.ID,
-		TotalScore:          health,
+		ScenarioID:          d.ScenarioID,
+		TotalScore:          totalScore,
 		Scores:              scores,
-		Passed:              health >= 80,
+		Passed:              totalScore >= 95.0,
 		AvgLatencyMS:        avgLatency,
-		ErrorRate:           errorRate,
 		TotalQPS:            currentQPS,
 		CreatedAt:           time.Now().Unix(),
 		ActiveComponentIDs:  activeIDs,
@@ -425,6 +403,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentReplicas:       compReplicas,
 		RetentionRate:           retentionRate,
 		IsRandomDrop:            isRandomDrop,
+		FulfilledQPS:            totalFulfilledQPS,
 	}, nil
 }
 

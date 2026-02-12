@@ -508,8 +508,8 @@ function Game() {
 
           {evaluationResult && (
             <div className="live-metrics">
-              <span className="metric">健康度: {evaluationResult.total_score.toFixed(1)}%</span>
-              <span className="metric">即時 QPS: {evaluationResult.total_qps}</span>
+              <span className="metric" title="成功獲取資料的請求比例">成功率: {evaluationResult.total_score.toFixed(1)}%</span>
+              <span className="metric">取得資料: {evaluationResult.fulfilled_qps} / {evaluationResult.total_qps} QPS</span>
             </div>
           )}
 
