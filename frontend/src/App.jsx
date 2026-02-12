@@ -253,11 +253,8 @@ function App() {
           return { ...node, data: { ...node.data, load: nodeLoad, active: isActive } };
         }
 
-        if (node.data.type === 'LOAD_BALANCER') {
-          return { ...node, data: { ...node.data, load: isActive ? res.total_qps : 0, active: isActive } };
-        }
-
-        return { ...node, data: { ...node.data, active: isActive, load: isActive ? undefined : 0 } };
+        // 其他組件（LB, DB, Cache 等）若在路徑上，顯示總 QPS
+        return { ...node, data: { ...node.data, active: isActive, load: isActive ? res.total_qps : 0 } };
       }));
     } catch (e) {
       console.error("解析評估結果失敗:", e);
