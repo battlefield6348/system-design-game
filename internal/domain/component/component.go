@@ -14,6 +14,7 @@ const (
 	WAF           Type = "WAF"
 	ObjectStorage Type = "OBJECT_STORAGE"
 	SearchEngine  Type = "SEARCH_ENGINE"
+	AutoScalingGroup  Type = "AUTO_SCALING_GROUP"
 )
 
 // Component 代表系統中的一個最小單位

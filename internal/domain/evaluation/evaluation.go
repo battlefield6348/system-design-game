@@ -28,6 +28,7 @@ type Result struct {
 	ComponentLoads      map[string]int64 `json:"component_loads"`       // 每個組件具體承擔的 QPS
 	ComponentEffectiveMaxQPS map[string]int64 `json:"component_effective_max_qps"` // 每個組件當前有效最大 QPS
 	IsBurstActive           bool             `json:"is_burst_active"`            // 當前是否處於突發流量狀態
+	ComponentReplicas       map[string]int   `json:"component_replicas"`         // 每個組件當前的副本數
 }
 
 // Engine 定義評估引擎的介面

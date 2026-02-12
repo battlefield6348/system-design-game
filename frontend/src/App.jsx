@@ -124,9 +124,14 @@ const CustomNode = ({ data, selected, id }) => {
   const isOverloaded = displayMaxQPS > 0 && data.load > displayMaxQPS;
   const isCrashed = data.crashed;
   const isBursting = data.isBurstActive && isTraffic;
+  const isASG = data.type === 'AUTO_SCALING_GROUP';
+
+  // For ASG, we render multiple server instances
+  const replicas = data.replicas || 1;
+  const instances = Array.from({ length: replicas });
 
   return (
-    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''} ${isBursting ? 'bursting' : ''}`}>
+    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''} ${isBursting ? 'bursting' : ''} ${isASG ? 'asg-container' : ''}`}>
       {isCrashed && (
         <div className="crashed-overlay">
           <div className="crashed-label">已崩潰</div>
@@ -153,21 +158,47 @@ const CustomNode = ({ data, selected, id }) => {
         isConnectable={!isTargetLimited && !isCrashed}
         className={isTargetLimited || isCrashed ? 'handle-limited' : ''}
       />
+
       <div className="node-content">
-        <div className="node-icon-wrapper">
-          <Icon size={40} />
-        </div>
-        <div className="node-info">
-          <div className="node-name">{data.label}</div>
-          <div className="node-type">{data.type}</div>
-          {data.load !== undefined && (
-            <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
-              {isCrashed ? '0' : data.load.toFixed(0)}
-              {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
+        {isASG ? (
+          <div className="asg-content">
+            <div className="asg-label-row">
+              <div className="node-name">{data.label}</div>
+              <div className="node-type">AUTO SCALING GROUP ({replicas} Nodes)</div>
             </div>
-          )}
-        </div>
+            <div className="asg-instances">
+              {instances.map((_, i) => (
+                <div key={i} className={`mini-instance ${data.active ? 'active' : ''}`}>
+                  <Server size={20} />
+                </div>
+              ))}
+            </div>
+            {data.load !== undefined && (
+              <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
+                {isCrashed ? '0' : data.load.toFixed(0)}
+                {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
+              </div>
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="node-icon-wrapper">
+              <Icon size={40} />
+            </div>
+            <div className="node-info">
+              <div className="node-name">{data.label}</div>
+              <div className="node-type">{data.type}</div>
+              {data.load !== undefined && (
+                <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
+                  {isCrashed ? '0' : data.load.toFixed(0)}
+                  {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
+                </div>
+              )}
+            </div>
+          </>
+        )}
       </div>
+
       <Handle
         id="s"
         type="source"
@@ -396,6 +427,7 @@ function Game() {
         const isCrashed = res.crashed_component_ids?.includes(node.id);
         const nodeLoad = res.component_loads?.[node.id] || 0;
         const effectiveMaxQPS = res.component_effective_max_qps?.[node.id] || 0;
+        const nodeReplicas = res.component_replicas?.[node.id] || 1;
 
         return {
           ...node,
@@ -406,6 +438,7 @@ function Game() {
             isBurstActive: res.is_burst_active,
             crashed: isCrashed || node.data.crashed,
             effectiveMaxQPS: effectiveMaxQPS,
+            replicas: nodeReplicas,
             properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
             onDelete: deleteNode,
             onRestart: restartNode
@@ -537,8 +570,8 @@ function Game() {
                       </div>
                     )}
 
-                    {/* Auto Scaling Logic for Web Server */}
-                    {selectedNode.data.type === 'WEB_SERVER' && (
+                    {/* Auto Scaling Logic for Web Server and ASG */}
+                    {(selectedNode.data.type === 'WEB_SERVER' || selectedNode.data.type === 'AUTO_SCALING_GROUP') && (
                       <>
                         <div className="prop-group checkbox">
                           <label>
@@ -691,6 +724,9 @@ function Game() {
               <div className="tool-list">
                 <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, auto_scaling: false, max_replicas: 5 })}>
                   <Plus size={14} /> 伺服器 (1k QPS)
+                </button>
+                <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5 })}>
+                  <Plus size={14} /> 彈性伸縮組 (ASG)
                 </button>
                 <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
                   <Plus size={14} /> 負載平衡器

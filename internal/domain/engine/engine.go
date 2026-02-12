@@ -97,11 +97,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
 	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
 
-	serverCount := int64(0)
+	compReplicas := make(map[string]int)
 	for _, c := range d.Components {
-		if c.Type == component.WebServer {
-			serverCount++
-		}
+		compReplicas[c.ID] = 1
 	}
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
@@ -183,8 +181,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		potentialTotalLoad := passesInputLoad[id]
 		compLoads[id] = potentialTotalLoad // 前端顯示的是「嘗試請求量」
 
-		// Auto Scaling Logic
-		if comp.Type == component.WebServer {
+		// Auto Scaling Logic (Shared by WebServer and AutoScalingGroup)
+		if comp.Type == component.WebServer || comp.Type == component.AutoScalingGroup {
 			if auto, ok := comp.Properties["auto_scaling"].(bool); ok && auto {
 				maxReplicas := 5
 				if v, ok := comp.Properties["max_replicas"].(float64); ok {
@@ -202,6 +200,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					replicas = 1
 				}
 				currentMaxQPS = baseMaxQPS * int64(replicas)
+				compReplicas[id] = replicas
+			} else {
+				compReplicas[id] = 1
 			}
 		}
 		compEffectiveMaxQPS[id] = currentMaxQPS
@@ -398,6 +399,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentLoads:           compLoads,
 		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
 		IsBurstActive:           isBurstActive,
+		ComponentReplicas:       compReplicas,
 	}, nil
 }
 
