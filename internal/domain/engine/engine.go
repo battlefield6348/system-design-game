@@ -50,9 +50,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	// 3. 遍歷圖形，找出有效的 WebServer
+	// 3. 遍歷圖形，找出各種單位的有效集合
 	visited := make(map[string]bool)
 	reachableWebServers := make(map[string]bool)
+	reachableDatabases := make(map[string]bool)
 	
 	var traverse func(string)
 	traverse = func(id string) {
@@ -65,6 +66,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		if comp.Type == component.WebServer {
 			reachableWebServers[id] = true
 		}
+		if comp.Type == component.Database {
+			reachableDatabases[id] = true
+		}
 		
 		for _, nextID := range adj[id] {
 			traverse(nextID)
@@ -75,15 +79,36 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		traverse(root)
 	}
 
-	// 4. 計算有效容量
-	var totalCapacity int64
-	for id := range reachableWebServers {
+	// 4. 計算各層級容量
+	getCompMaxQPS := func(id string) int64 {
 		comp := compMap[id]
 		if maxQPS, ok := comp.Properties["max_qps"].(int64); ok {
-			totalCapacity += maxQPS
+			return maxQPS
 		} else if maxQPSFloat, ok := comp.Properties["max_qps"].(float64); ok {
-			totalCapacity += int64(maxQPSFloat)
+			return int64(maxQPSFloat)
 		}
+		return 0
+	}
+
+	var serverCapacity int64
+	for id := range reachableWebServers {
+		serverCapacity += getCompMaxQPS(id)
+	}
+
+	var dbCapacity int64
+	for id := range reachableDatabases {
+		dbCapacity += getCompMaxQPS(id)
+	}
+
+	// 系統總容量由最弱的一環決定 (瓶頸原理)
+	// 如果沒有資料庫，則只看伺服器；如果有資料庫，取兩者最小值
+	totalCapacity := serverCapacity
+	if len(reachableDatabases) > 0 && dbCapacity < totalCapacity {
+		totalCapacity = dbCapacity
+	}
+	// 如果連 WebServer 都沒有連上，總量為 0
+	if len(reachableWebServers) == 0 {
+		totalCapacity = 0
 	}
 
 	// 根據經過時間計算當前應有的 QPS

@@ -312,7 +312,7 @@ function App() {
             <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
               <Plus size={14} /> 負載平衡器
             </button>
-            <button onClick={() => addComponent('DATABASE', '資料庫', Database, { capacity: 500 })}>
+            <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500 })}>
               <Plus size={14} /> 資料庫
             </button>
           </div>
