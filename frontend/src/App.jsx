@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -345,6 +345,68 @@ function Game() {
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
   const [retentionRate, setRetentionRate] = useState(1.0);
+  const [clipboardNode, setClipboardNode] = useState(null);
+
+  const onCopy = useCallback(() => {
+    const selectedNode = nodes.find((node) => node.selected);
+    if (selectedNode) {
+      setClipboardNode(selectedNode);
+    }
+  }, [nodes]);
+
+  const onPaste = useCallback(() => {
+    if (!clipboardNode) return;
+
+    const id = `${clipboardNode.data.type?.toLowerCase()}-${Date.now()}`;
+    const newNode = {
+      ...clipboardNode,
+      id,
+      selected: true,
+      position: {
+        x: clipboardNode.position.x + 40,
+        y: clipboardNode.position.y + 40,
+      },
+      data: {
+        ...clipboardNode.data,
+        onDelete: deleteNode,
+        onRestart: restartNode,
+      },
+    };
+
+    // 取消其他節點的選取，並加入新節點
+    setNodes((nds) => nds.map((node) => ({ ...node, selected: false })).concat(newNode));
+  }, [clipboardNode, deleteNode, restartNode, setNodes]);
+
+  // 全域快捷鍵監聽
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+      const modifier = isMac ? e.metaKey : e.ctrlKey;
+
+      // 只有在非輸入框狀態下才觸發
+      if (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA' || document.activeElement.tagName === 'SELECT') {
+        return;
+      }
+
+      if (modifier && e.key === 'c') {
+        e.preventDefault();
+        onCopy();
+      }
+      if (modifier && e.key === 'v') {
+        e.preventDefault();
+        onPaste();
+      }
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        const selectedNodes = nodes.filter(n => n.selected);
+        if (selectedNodes.length > 0) {
+          onNodesDelete(selectedNodes);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [onCopy, onPaste, nodes, onNodesDelete]);
 
   const deleteNode = useCallback((id) => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
@@ -652,7 +714,12 @@ function Game() {
         <aside className="tool-panel">
           {nodes.find(n => n.selected) ? (
             <div className="property-editor">
-              <h3>組件設定</h3>
+              <div className="property-header">
+                <h3>組件設定</h3>
+                <button className="btn-icon-sm" onClick={onCopy} title="複製組件 (Cmd+C)">
+                  <Copy size={16} />
+                </button>
+              </div>
               {(() => {
                 const selectedNode = nodes.find(n => n.selected);
                 return (
