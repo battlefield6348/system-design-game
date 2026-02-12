@@ -22,5 +22,8 @@ type Component struct {
 	Properties      Metadata `json:"properties"`       // 儲存組件的具體參數（如：記憶體大小、連線數限制）
 }
 
-// Metadata 儲存組件的屬性
+// Metadata 儲存組件的屬性，例如：
+// "max_qps": 1000
+// "base_latency": 50
+// "max_connections": 500
 type Metadata map[string]interface{}
