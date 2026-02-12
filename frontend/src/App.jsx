@@ -42,6 +42,15 @@ const CustomEdge = ({
 
   return (
     <>
+      {/* 隱形寬路徑：增加滑鼠感應範圍 (20px 寬) */}
+      <path
+        d={edgePath}
+        fill="none"
+        stroke="transparent"
+        strokeWidth={20}
+        className="react-flow__edge-interaction"
+        style={{ cursor: 'pointer', pointerEvents: 'all' }}
+      />
       {/* 底層實線 */}
       <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, stroke: '#334155', strokeWidth: 2 }} />
       {/* 頂層流動脈衝 (僅在 animated 時顯示) */}
@@ -57,13 +66,15 @@ const CustomEdge = ({
           style={{
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
-            fontSize: 12,
             pointerEvents: 'all',
           }}
           className="edge-button-container nodrag nopan"
         >
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
-            <X size={12} strokeWidth={3} />
+            <div className="edge-delete-inner">
+              <X size={14} strokeWidth={3} />
+              <span className="edge-delete-text">刪除</span>
+            </div>
           </button>
         </div>
       </EdgeLabelRenderer>
