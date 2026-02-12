@@ -248,9 +248,6 @@ function App() {
         id: 'traffic-1',
         type: 'custom',
         position: { x: 50, y: 150 },
-        id: 'traffic-1',
-        type: 'custom',
-        position: { x: 50, y: 150 },
         data: {
           label: '使用者流量',
           type: 'TRAFFIC_SOURCE',
