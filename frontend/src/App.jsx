@@ -123,9 +123,10 @@ const CustomNode = ({ data, selected, id }) => {
 
   const isOverloaded = displayMaxQPS > 0 && data.load > displayMaxQPS;
   const isCrashed = data.crashed;
+  const isBursting = data.isBurstActive && isTraffic;
 
   return (
-    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''}`}>
+    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''} ${isBursting ? 'bursting' : ''}`}>
       {isCrashed && (
         <div className="crashed-overlay">
           <div className="crashed-label">已崩潰</div>
@@ -402,6 +403,7 @@ function Game() {
             ...node.data,
             load: isActiveNode ? nodeLoad : 0,
             active: isActiveNode,
+            isBurstActive: res.is_burst_active,
             crashed: isCrashed || node.data.crashed,
             effectiveMaxQPS: effectiveMaxQPS,
             properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
@@ -461,6 +463,10 @@ function Game() {
               <span className="metric">健康度: {evaluationResult.total_score.toFixed(1)}%</span>
               <span className="metric">即時 QPS: {evaluationResult.total_qps}</span>
             </div>
+          )}
+
+          {evaluationResult?.is_burst_active && (
+            <div className="burst-badge">BURSTING!</div>
           )}
 
           {/* 自動排版按鈕 */}
@@ -586,19 +592,21 @@ function Game() {
 
                     {/* Burst Traffic Logic for Traffic Source */}
                     {selectedNode.data.type === 'TRAFFIC_SOURCE' && (
-                      <div className="prop-group checkbox">
-                        <label>
+                      <div className="props-form">
+                        <div className="prop-group">
+                          <label>初始 QPS (Start QPS)</label>
                           <input
-                            type="checkbox"
-                            checked={selectedNode.data.properties.burst_traffic || false}
+                            type="number"
+                            value={selectedNode.data.properties.start_qps || 0}
                             onChange={(e) => {
+                              const val = parseInt(e.target.value) || 0;
                               setNodes(nds => nds.map(n => {
                                 if (n.id === selectedNode.id) {
                                   return {
                                     ...n,
                                     data: {
                                       ...n.data,
-                                      properties: { ...n.data.properties, burst_traffic: e.target.checked }
+                                      properties: { ...n.data.properties, start_qps: val }
                                     }
                                   };
                                 }
@@ -606,8 +614,30 @@ function Game() {
                               }));
                             }}
                           />
-                          啟用突發流量 (Simulate Spikes)
-                        </label>
+                        </div>
+                        <div className="prop-group checkbox">
+                          <label>
+                            <input
+                              type="checkbox"
+                              checked={selectedNode.data.properties.burst_traffic || false}
+                              onChange={(e) => {
+                                setNodes(nds => nds.map(n => {
+                                  if (n.id === selectedNode.id) {
+                                    return {
+                                      ...n,
+                                      data: {
+                                        ...n.data,
+                                        properties: { ...n.data.properties, burst_traffic: e.target.checked }
+                                      }
+                                    };
+                                  }
+                                  return n;
+                                }));
+                              }}
+                            />
+                            啟用突發流量 (Simulate Spikes)
+                          </label>
+                        </div>
                       </div>
                     )}
 

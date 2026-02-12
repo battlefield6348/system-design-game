@@ -53,6 +53,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	// 3. 獲取當前應有的 QPS
 	var baseQPS int64
+	var isBurstActive bool
 	for _, comp := range d.Components {
 		if comp.Type == component.TrafficSource {
 			if v, ok := comp.Properties["start_qps"].(float64); ok {
@@ -63,9 +64,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			
 			// 處理突發流量 (Burst)
 			if burst, ok := comp.Properties["burst_traffic"].(bool); ok && burst {
-				// 每 15 秒會有一次 5 倍流量的突發，持續 3 秒
-				if elapsedSeconds%15 < 3 {
+				// 每 10 秒會有一次 5 倍流量的突發，持續 3 秒
+				if elapsedSeconds%10 < 3 {
 					baseQPS *= 5
+					isBurstActive = true
 				}
 			}
 		}
@@ -395,6 +397,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		CrashedComponentIDs: crashedIDs,
 		ComponentLoads:           compLoads,
 		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
+		IsBurstActive:           isBurstActive,
 	}, nil
 }
 
