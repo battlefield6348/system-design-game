@@ -23,6 +23,7 @@ type Result struct {
 	RevenuePerSec float64 `json:"revenue_per_sec"`
 
 	CreatedAt int64 `json:"created_at"`
+	ActiveComponentIDs []string `json:"active_component_ids"` // 實際有接收到流量的組件 ID
 }
 
 // Engine 定義評估引擎的介面

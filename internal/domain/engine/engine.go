@@ -119,6 +119,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("有效總容量: %d QPS, 當前流量: %d QPS", totalCapacity, currentQPS)},
 	}
 
+	// 收集活躍組件 ID
+	activeIDs := make([]string, 0)
+	for id := range reachableWebServers {
+		activeIDs = append(activeIDs, id)
+	}
+	// 流量來源也算是活躍的
+	activeIDs = append(activeIDs, roots...)
+
 	passed := health >= 80
 
 	return &evaluation.Result{
@@ -131,5 +139,6 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ErrorRate:     errorRate,
 		TotalQPS:      currentQPS,
 		CreatedAt:     time.Now().Unix(),
+		ActiveComponentIDs: activeIDs,
 	}, nil
 }

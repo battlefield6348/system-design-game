@@ -217,16 +217,22 @@ function App() {
         }))
       );
 
-      // 同步更新節點狀態（顯示即時負載）
+      // 同步更新節點狀態（僅針對活躍路徑組件顯示負載）
       setNodes((nds) => nds.map(node => {
+        const isActive = res.active_component_ids?.includes(node.id) && isAutoEvaluating;
+
         if (node.id === 'traffic-1') {
-          return { ...node, data: { ...node.data, load: res.total_qps, active: isActive } };
+          return { ...node, data: { ...node.data, load: res.total_qps, active: isAutoEvaluating } };
         }
+
         if (node.data.type === 'WEB_SERVER') {
-          // 簡單估計：如果連接到了，顯示平均分配的 QPS
-          return { ...node, data: { ...node.data, load: res.total_score > 0 ? res.total_qps / Math.max(1, nds.filter(n => n.data.type === 'WEB_SERVER').length) : 0, active: isActive } };
+          // 僅針對活躍的伺服器平攤 QPS
+          const activeServersCount = nds.filter(n => n.data.type === 'WEB_SERVER' && res.active_component_ids?.includes(n.id)).length;
+          const nodeLoad = isActive ? (res.total_qps / Math.max(1, activeServersCount)) : 0;
+          return { ...node, data: { ...node.data, load: nodeLoad, active: isActive } };
         }
-        return { ...node, data: { ...node.data, active: isActive } };
+
+        return { ...node, data: { ...node.data, active: isActive, load: isActive ? undefined : 0 } };
       }));
     } catch (e) {
       console.error("解析評估結果失敗:", e);
