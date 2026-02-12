@@ -104,9 +104,11 @@ const CustomNode = ({ data, selected, id }) => {
   const isTraffic = data.type === 'TRAFFIC_SOURCE';
   const isServer = data.type === 'WEB_SERVER';
 
-  // 監控連線數量
-  const connectionsIn = useHandleConnections({ type: 'target', id: 't' });
-  const connectionsOut = useHandleConnections({ type: 'source', id: 's' });
+  // 監控連線數量 (暫時移除以排查白屏問題)
+  // const connectionsIn = useHandleConnections({ type: 'target', id: 't' });
+  // const connectionsOut = useHandleConnections({ type: 'source', id: 's' });
+  const connectionsIn = [];
+  const connectionsOut = [];
 
   const isTargetLimited = isServer && connectionsIn.length >= 1;
   const isSourceLimited = isTraffic && connectionsOut.length >= 1;
@@ -175,6 +177,10 @@ const edgeTypes = {
 };
 
 function App() {
+  const [isWasmLoaded, setIsWasmLoaded] = useState(false);
+  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+
   // 支援多選刪除
   const onNodesDelete = useCallback((nodesToDelete) => {
     const nodeIds = new Set(nodesToDelete.map((n) => n.id));
@@ -413,10 +419,7 @@ function App() {
             edgeTypes={edgeTypes}
             fitView
             selectionOnDrag={true}
-            selectionKeyCode="Shift"
-            panOnDrag={[1, 2]}
             selectionMode="partial"
-            multiSelectionKeyCode="Control"
           >
             <Background color="#333" gap={20} />
             <Controls />
