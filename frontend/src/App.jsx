@@ -412,10 +412,11 @@ function App() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
-            selectionOnDrag={true} // 啟用圈選功能
-            selectionKeyCode="Shift" // 按住 Shift 進行圈選（或者直接拖曳，視設定而定）
-            panOnDrag={[1, 2]} // 設定滑鼠中鍵和右鍵可以平移畫布，左鍵留給圈選 (如果是 false 則左鍵平移)
+            selectionOnDrag={true}
+            selectionKeyCode="Shift"
+            panOnDrag={[1, 2]}
             selectionMode="partial"
+            multiSelectionKeyCode="Control"
           >
             <Background color="#333" gap={20} />
             <Controls />
