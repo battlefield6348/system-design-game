@@ -66,7 +66,13 @@ const CustomEdge = ({
       {data?.animated && (
         <BaseEdge
           path={edgePath}
-          style={{ ...style, stroke: '#6366f1', strokeWidth: 3 }}
+          style={{
+            ...style,
+            stroke: '#6366f1',
+            strokeWidth: 3,
+            animationDuration: data.load ? `${Math.max(0.5, 3 - (data.load / 5000))}s` : '1.5s',
+            strokeDasharray: data.load ? `5, ${Math.max(20, 100 - (data.load / 100))}` : '10, 90'
+          }}
           className="animated"
         />
       )}
@@ -293,36 +299,30 @@ function App() {
       const isActive = res.total_score > 0 && isAutoEvaluating;
 
       setEdges((prevEdges) =>
-        prevEdges.map(edge => ({
-          ...edge,
-          animated: isActive,
-          className: isActive ? 'animated' : ''
-        }))
+        prevEdges.map(edge => {
+          const targetLoad = res.component_loads?.[edge.target] || 0;
+          return {
+            ...edge,
+            animated: isActive,
+            className: isActive ? 'animated' : '',
+            data: { ...edge.data, load: targetLoad, onDelete: deleteEdge }
+          };
+        })
       );
 
-      // 同步更新節點狀態（僅針對活躍路徑組件顯示負載）
+      // 同步更新節點狀態
       setNodes((nds) => nds.map(node => {
         const isPathActive = res.active_component_ids?.includes(node.id);
-        const isActive = isPathActive && isAutoEvaluating;
+        const isActiveNode = isPathActive && isAutoEvaluating;
         const isCrashed = res.crashed_component_ids?.includes(node.id);
+        const nodeLoad = res.component_loads?.[node.id] || 0;
 
-        if (node.id === 'traffic-1') {
-          return { ...node, data: { ...node.data, load: res.total_qps, active: isAutoEvaluating } };
-        }
-
-        if (node.data.type === 'WEB_SERVER') {
-          const activeServers = nds.filter(n => n.data.type === 'WEB_SERVER' && res.active_component_ids?.includes(n.id) && !res.crashed_component_ids?.includes(n.id));
-          const nodeLoad = (isActive && !isCrashed) ? (res.total_qps / Math.max(1, activeServers.length)) : 0;
-          return { ...node, data: { ...node.data, load: nodeLoad, active: isActive, crashed: isCrashed } };
-        }
-
-        // 資料庫 (DATABASE)、負載平衡器 (LB) 等
         return {
           ...node,
           data: {
             ...node.data,
-            load: (isActive && !isCrashed) ? res.total_qps : 0,
-            active: isActive,
+            load: isActiveNode ? nodeLoad : 0,
+            active: isActiveNode,
             crashed: isCrashed || node.data.crashed,
             properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
             onDelete: deleteNode,

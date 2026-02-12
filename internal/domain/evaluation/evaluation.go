@@ -22,9 +22,10 @@ type Result struct {
 	CostPerSec   float64 `json:"cost_per_sec"`
 	RevenuePerSec float64 `json:"revenue_per_sec"`
 
-	CreatedAt int64 `json:"created_at"`
-	ActiveComponentIDs  []string `json:"active_component_ids"`  // 實際有接收到流量的組件 ID
-	CrashedComponentIDs []string `json:"crashed_component_ids"` // 已經掛掉的組件 ID
+	CreatedAt           int64            `json:"created_at"`
+	ActiveComponentIDs  []string         `json:"active_component_ids"`  // 實際有接收到流量的組件 ID
+	CrashedComponentIDs []string         `json:"crashed_component_ids"` // 已經掛掉的組件 ID
+	ComponentLoads      map[string]int64 `json:"component_loads"`       // 每個組件具體承擔的 QPS
 }
 
 // Engine 定義評估引擎的介面
