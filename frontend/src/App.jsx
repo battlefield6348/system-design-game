@@ -110,7 +110,17 @@ const CustomNode = ({ data, selected, id }) => {
 
   return (
     <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''}`}>
-      {isCrashed && <div className="crashed-overlay">CRASHED</div>}
+      {isCrashed && (
+        <div className="crashed-overlay">
+          <div className="crashed-label">已崩潰</div>
+          <button className="restart-btn" onClick={(e) => {
+            e.stopPropagation();
+            data.onRestart(id);
+          }}>
+            重啟服務
+          </button>
+        </div>
+      )}
       {!isTraffic && (
         <div className="delete-btn" onClick={(e) => {
           e.stopPropagation();
@@ -174,6 +184,23 @@ function App() {
   const deleteEdge = useCallback((id) => {
     setEdges((eds) => eds.filter((edge) => edge.id !== id));
   }, [setEdges]);
+
+  // 重啟崩潰節點
+  const restartNode = useCallback((id) => {
+    setNodes((nds) => nds.map(node => {
+      if (node.id === id) {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            crashed: false,
+            properties: { ...node.data.properties, crashed: false }
+          }
+        };
+      }
+      return node;
+    }));
+  }, [setNodes]);
 
   useEffect(() => {
     const go = new window.Go();
@@ -289,8 +316,19 @@ function App() {
           return { ...node, data: { ...node.data, load: nodeLoad, active: isActive, crashed: isCrashed } };
         }
 
-        // 其他組件（LB, DB, Cache 等）
-        return { ...node, data: { ...node.data, load: (isActive && !isCrashed) ? res.total_qps : 0, active: isActive, crashed: isCrashed } };
+        // 資料庫 (DATABASE)、負載平衡器 (LB) 等
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            load: (isActive && !isCrashed) ? res.total_qps : 0,
+            active: isActive,
+            crashed: isCrashed || node.data.crashed,
+            properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
+            onDelete: deleteNode,
+            onRestart: restartNode
+          }
+        };
       }));
     } catch (e) {
       console.error("解析評估結果失敗:", e);

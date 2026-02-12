@@ -59,12 +59,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	
 	var traverse func(string)
 	traverse = func(id string) {
-		if visited[id] || crashedNodes[id] {
+		comp, exists := compMap[id]
+		if !exists || visited[id] {
 			return
 		}
-		visited[id] = true
+
+		// 檢查持久性崩潰標記 (必須由外部操作重啟)
+		if crashed, ok := comp.Properties["crashed"].(bool); ok && crashed {
+			return
+		}
 		
-		comp := compMap[id]
+		visited[id] = true
 		if comp.Type == component.WebServer {
 			reachableWebServers[id] = true
 		}
