@@ -247,40 +247,113 @@ body {
   background: var(--accent-color);
 }
 
-.react-flow__edge-path {
-  stroke: rgba(255, 255, 255, 0.3);
-  stroke-width: 3;
+/* 流量流動動畫 */
+@keyframes dash-flow {
+  from {
+    stroke-dashoffset: 30;
+  }
+
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
-/* 修正控制項與地圖顯示 */
+.react-flow__edge-path.animated {
+  stroke-dasharray: 10;
+  animation: dash-flow 1.0s linear infinite;
+  /* 稍微減慢一點點 */
+  stroke: #818cf8 !important;
+  stroke-width: 4;
+  filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.6));
+}
+
+/* 線條刪除按鈕 */
+.edge-delete-btn {
+  width: 18px;
+  height: 18px;
+  background: #ef4444;
+  border: 1px solid #1e293b;
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  transition: all 0.2s;
+}
+
+.edge-delete-btn:hover {
+  transform: scale(1.2);
+  background: #ff5555;
+}
+
+/* 服務圖示動態脈衝 */
+@keyframes pulse-active {
+  0% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4);
+  }
+
+  70% {
+    box-shadow: 0 0 0 10px rgba(99, 102, 241, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(99, 102, 241, 0);
+  }
+}
+
+.custom-node.active {
+  animation: pulse-active 2s infinite;
+}
+
+/* 節點內的刪除按鈕 */
+.delete-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  width: 20px;
+  height: 20px;
+  background: #ef4444;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border: 2px solid #1e293b;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10;
+}
+
+.custom-node:hover .delete-btn {
+  opacity: 1;
+}
+
+.node-stats {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.65rem;
+  color: var(--warning);
+  font-family: monospace;
+}
+
+/* 修正控制項與地圖 */
 .react-flow__controls {
-  background: var(--panel-bg);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  overflow: hidden;
+  background: rgba(30, 41, 59, 0.8) !important;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: none !important;
 }
 
 .react-flow__controls-button {
-  background: transparent;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  fill: var(--text-primary);
-}
-
-.react-flow__controls-button:hover {
-  background: rgba(255, 255, 255, 0.1);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  fill: white !important;
 }
 
 .react-flow__minimap {
-  background-color: #020617;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-}
-
-.react-flow__minimap-mask {
-  fill: rgba(0, 0, 0, 0.7);
-}
-
-.react-flow__minimap-node {
-  fill: var(--accent-color);
-  stroke: none;
+  background: rgba(15, 23, 42, 0.9) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }

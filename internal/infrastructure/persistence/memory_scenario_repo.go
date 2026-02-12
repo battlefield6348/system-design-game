@@ -30,9 +30,9 @@ func (r *InMemScenarioRepository) initMockData() {
 			Duration:     60, // 持續 60 秒的測試
 		},
 		Phases: []scenario.TrafficPhase{
-			{Name: "Initial Launch", StartQPS: 100, EndQPS: 1000, DurationSeconds: 10},
-			{Name: "Going Viral", StartQPS: 1000, EndQPS: 5000, DurationSeconds: 10},
-			{Name: "Peak Traffic", StartQPS: 5000, EndQPS: 10000, DurationSeconds: 10},
+			{Name: "初期上線", StartQPS: 100, EndQPS: 1000, DurationSeconds: 60},    // 1 分鐘成長到 1k
+			{Name: "口碑傳播", StartQPS: 1000, EndQPS: 5000, DurationSeconds: 120},  // 2 分鐘成長到 5k
+			{Name: "流量巔峰", StartQPS: 5000, EndQPS: 10000, DurationSeconds: 300}, // 5 分鐘成長到 10k
 		},
 	}
 	r.scenarios[s1.ID] = s1

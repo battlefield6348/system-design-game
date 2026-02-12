@@ -9,22 +9,84 @@ import {
   addEdge,
   Handle,
   Position,
+  BaseEdge,
+  EdgeLabelRenderer,
+  getBezierPath,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X } from 'lucide-react';
 import './App.css';
 
-// 自定義節點組件
-const CustomNode = ({ data, selected }) => {
-  const Icon = data.icon || Server;
+// 自定義連線組件 (帶有刪除按鈕)
+const CustomEdge = ({
+  id,
+  sourceX,
+  sourceY,
+  targetX,
+  targetY,
+  sourcePosition,
+  targetPosition,
+  style = {},
+  markerEnd,
+  data,
+}) => {
+  const [edgePath, labelX, labelY] = getBezierPath({
+    sourceX,
+    sourceY,
+    sourcePosition,
+    targetX,
+    targetY,
+    targetPosition,
+  });
+
   return (
-    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''}`}>
+    <>
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} className={data?.animated ? 'animated' : ''} />
+      <EdgeLabelRenderer>
+        <div
+          style={{
+            position: 'absolute',
+            transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
+            fontSize: 12,
+            pointerEvents: 'all',
+          }}
+          className="nodrag nopan"
+        >
+          <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
+            <X size={10} strokeWidth={4} />
+          </button>
+        </div>
+      </EdgeLabelRenderer>
+    </>
+  );
+};
+
+// 自定義節點組件
+const CustomNode = ({ data, selected, id }) => {
+  const Icon = data.icon || Server;
+  const isTraffic = data.type === 'TRAFFIC_SOURCE';
+
+  return (
+    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''}`}>
+      {!isTraffic && (
+        <div className="delete-btn" onClick={(e) => {
+          e.stopPropagation();
+          data.onDelete(id);
+        }}>
+          <X size={12} strokeWidth={3} />
+        </div>
+      )}
       <Handle type="target" position={Position.Left} />
       <div className="node-content">
         <Icon size={20} />
         <div className="node-info">
           <div className="node-name">{data.label}</div>
           <div className="node-type">{data.type}</div>
+          {data.load !== undefined && (
+            <div className="node-stats">
+              {data.load.toFixed(0)} QPS
+            </div>
+          )}
         </div>
       </div>
       <Handle type="source" position={Position.Right} />
@@ -36,6 +98,10 @@ const nodeTypes = {
   custom: CustomNode,
 };
 
+const edgeTypes = {
+  custom: CustomEdge,
+};
+
 function App() {
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -43,6 +109,15 @@ function App() {
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
+
+  const deleteNode = useCallback((id) => {
+    setNodes((nds) => nds.filter((node) => node.id !== id));
+    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  }, [setNodes, setEdges]);
+
+  const deleteEdge = useCallback((id) => {
+    setEdges((eds) => eds.filter((edge) => edge.id !== id));
+  }, [setEdges]);
 
   useEffect(() => {
     const go = new window.Go();
@@ -75,14 +150,21 @@ function App() {
         id: 'traffic-1',
         type: 'custom',
         position: { x: 50, y: 150 },
-        data: { label: '使用者流量', type: '流量來源', icon: Activity },
-        deletable: false, // 流量起點不准刪除
+        data: { label: '使用者流量', type: 'TRAFFIC_SOURCE', icon: Activity, onDelete: deleteNode },
+        deletable: false,
       }
     ];
     setNodes(initialNodes);
   };
 
-  const onConnect = useCallback((params) => setEdges((eds) => addEdge(params, eds)), [setEdges]);
+  const onConnect = useCallback((params) => {
+    const newEdge = {
+      ...params,
+      type: 'custom',
+      data: { onDelete: deleteEdge }
+    };
+    setEdges((eds) => addEdge(newEdge, eds));
+  }, [setEdges, deleteEdge]);
 
   const addComponent = (type, label, icon, properties = {}) => {
     const id = `${type.toLowerCase()}-${Date.now()}`;
@@ -90,7 +172,7 @@ function App() {
       id,
       type: 'custom',
       position: { x: 300, y: 150 },
-      data: { label, type, icon, properties },
+      data: { label, type, icon, properties, onDelete: deleteNode },
     };
     setNodes((nds) => nds.concat(newNode));
   };
@@ -121,7 +203,31 @@ function App() {
     // 執行評估 (傳入當前遊戲秒數)
     const resultStr = window.goEvaluate("live-design", currentTime);
     try {
-      setEvaluationResult(JSON.parse(resultStr));
+      const res = JSON.parse(resultStr);
+      setEvaluationResult(res);
+
+      // 動態更新連線動畫：只要系統健康度大於 0 且正在模擬就讓它流動
+      const isActive = res.total_score > 0 && isAutoEvaluating;
+
+      setEdges((prevEdges) =>
+        prevEdges.map(edge => ({
+          ...edge,
+          animated: isActive,
+          className: isActive ? 'animated' : ''
+        }))
+      );
+
+      // 同步更新節點狀態（顯示即時負載）
+      setNodes((nds) => nds.map(node => {
+        if (node.id === 'traffic-1') {
+          return { ...node, data: { ...node.data, load: res.total_qps, active: isActive } };
+        }
+        if (node.data.type === 'WEB_SERVER') {
+          // 簡單估計：如果連接到了，顯示平均分配的 QPS
+          return { ...node, data: { ...node.data, load: res.total_score > 0 ? res.total_qps / Math.max(1, nds.filter(n => n.data.type === 'WEB_SERVER').length) : 0, active: isActive } };
+        }
+        return { ...node, data: { ...node.data, active: isActive } };
+      }));
     } catch (e) {
       console.error("解析評估結果失敗:", e);
     }
@@ -195,6 +301,7 @@ function App() {
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
             nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
             fitView
           >
             <Background color="#333" gap={20} />
