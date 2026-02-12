@@ -42,7 +42,16 @@ const CustomEdge = ({
 
   return (
     <>
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={style} className={data?.animated ? 'animated' : ''} />
+      {/* 底層實線 */}
+      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, stroke: '#334155', strokeWidth: 2 }} />
+      {/* 頂層流動脈衝 (僅在 animated 時顯示) */}
+      {data?.animated && (
+        <BaseEdge
+          path={edgePath}
+          style={{ ...style, stroke: '#6366f1', strokeWidth: 3 }}
+          className="animated"
+        />
+      )}
       <EdgeLabelRenderer>
         <div
           style={{
@@ -51,10 +60,10 @@ const CustomEdge = ({
             fontSize: 12,
             pointerEvents: 'all',
           }}
-          className="nodrag nopan"
+          className="edge-button-container nodrag nopan"
         >
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
-            <X size={10} strokeWidth={4} />
+            <X size={12} strokeWidth={3} />
           </button>
         </div>
       </EdgeLabelRenderer>

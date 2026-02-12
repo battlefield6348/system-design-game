@@ -247,10 +247,10 @@ body {
   background: var(--accent-color);
 }
 
-/* 流量流動動畫 */
-@keyframes dash-flow {
+/* 流量流動動畫：產生一個沿著路徑滑動的小光點 */
+@keyframes flow-pulse {
   from {
-    stroke-dashoffset: 30;
+    stroke-dashoffset: 100;
   }
 
   to {
@@ -259,33 +259,48 @@ body {
 }
 
 .react-flow__edge-path.animated {
-  stroke-dasharray: 10;
-  animation: dash-flow 1.0s linear infinite;
-  /* 稍微減慢一點點 */
-  stroke: #818cf8 !important;
-  stroke-width: 4;
-  filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.6));
+  stroke-dasharray: 10, 90;
+  /* 10 是光點長度，90 是間距 */
+  stroke-linecap: round;
+  animation: flow-pulse 1.5s linear infinite;
+  filter: drop-shadow(0 0 5px rgba(99, 102, 241, 0.8));
 }
 
-/* 線條刪除按鈕 */
+.react-flow__edge:hover .react-flow__edge-path {
+  stroke-width: 4 !important;
+  opacity: 1;
+}
+
+/* 線條刪除按鈕容器 - 平常隱藏，懸浮連線才顯示 */
+.edge-button-container {
+  opacity: 0;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.react-flow__edge:hover .edge-button-container {
+  opacity: 1;
+}
+
 .edge-delete-btn {
-  width: 18px;
-  height: 18px;
-  background: #ef4444;
-  border: 1px solid #1e293b;
+  width: 22px;
+  height: 22px;
+  background: #1e293b;
+  border: 1px solid #ef4444;
   border-radius: 50%;
-  color: white;
+  color: #ef4444;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
   transition: all 0.2s;
 }
 
 .edge-delete-btn:hover {
-  transform: scale(1.2);
-  background: #ff5555;
+  transform: scale(1.15);
+  background: #ef4444;
+  color: white;
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.5);
 }
 
 /* 服務圖示動態脈衝 */
