@@ -12,10 +12,12 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
-  useHandleConnections,
+  useReactFlow,
+  ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout } from 'lucide-react';
+import dagre from 'dagre';
 import './App.css';
 
 // 自定義連線組件 (帶有刪除按鈕)
@@ -113,7 +115,13 @@ const CustomNode = ({ data, selected, id }) => {
   const isTargetLimited = isServer && connectionsIn.length >= 1;
   const isSourceLimited = isTraffic && connectionsOut.length >= 1;
 
-  const isOverloaded = data.properties?.max_qps && data.load > data.properties.max_qps;
+  // Determine Max QPS to display
+  // If active and we have effectiveMaxQPS from backend, use it. Otherwise use static property.
+  const displayMaxQPS = (data.active && data.effectiveMaxQPS)
+    ? data.effectiveMaxQPS
+    : (data.properties?.max_qps || 0);
+
+  const isOverloaded = displayMaxQPS > 0 && data.load > displayMaxQPS;
   const isCrashed = data.crashed;
 
   return (
@@ -152,9 +160,9 @@ const CustomNode = ({ data, selected, id }) => {
           <div className="node-name">{data.label}</div>
           <div className="node-type">{data.type}</div>
           {data.load !== undefined && (
-            <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${(data.properties?.max_qps && data.load > data.properties.max_qps) ? 'overloaded' : ''}`}>
+            <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
               {isCrashed ? '0' : data.load.toFixed(0)}
-              {data.properties?.max_qps ? ` / ${data.properties.max_qps}` : ''} QPS
+              {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
             </div>
           )}
         </div>
@@ -178,10 +186,48 @@ const edgeTypes = {
   custom: CustomEdge,
 };
 
-function App() {
+const getLayoutedElements = (nodes, edges, direction = 'LR') => {
+  const dagreGraph = new dagre.graphlib.Graph();
+  dagreGraph.setDefaultEdgeLabel(() => ({}));
+
+  const isHorizontal = direction === 'LR';
+  dagreGraph.setGraph({ rankdir: direction });
+
+  nodes.forEach((node) => {
+    dagreGraph.setNode(node.id, { width: 260, height: 120 });
+  });
+
+  edges.forEach((edge) => {
+    dagreGraph.setEdge(edge.source, edge.target);
+  });
+
+  dagre.layout(dagreGraph);
+
+  const newNodes = nodes.map((node) => {
+    const nodeWithPosition = dagreGraph.node(node.id);
+    const newNode = {
+      ...node,
+      targetPosition: isHorizontal ? 'left' : 'top',
+      sourcePosition: isHorizontal ? 'right' : 'bottom',
+      // We are shifting the dagre node position (anchor=center center) to the top left
+      // so it matches the React Flow node anchor point (top left).
+      position: {
+        x: nodeWithPosition.x - 260 / 2,
+        y: nodeWithPosition.y - 120 / 2,
+      },
+    };
+
+    return newNode;
+  });
+
+  return { nodes: newNodes, edges };
+};
+
+function Game() {
   const [isWasmLoaded, setIsWasmLoaded] = useState(false);
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const { fitView } = useReactFlow();
 
   // 支援多選刪除
   const onNodesDelete = useCallback((nodesToDelete) => {
@@ -218,6 +264,21 @@ function App() {
       return node;
     }));
   }, [setNodes, gameTime]);
+
+  const onLayout = useCallback((direction) => {
+    const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
+      nodes,
+      edges,
+      direction,
+    );
+
+    setNodes([...layoutedNodes]);
+    setEdges([...layoutedEdges]);
+
+    window.requestAnimationFrame(() => {
+      fitView();
+    });
+  }, [nodes, edges, setNodes, setEdges, fitView]);
 
   useEffect(() => {
     const go = new window.Go();
@@ -333,6 +394,7 @@ function App() {
         const isActiveNode = isPathActive && isAutoEvaluating;
         const isCrashed = res.crashed_component_ids?.includes(node.id);
         const nodeLoad = res.component_loads?.[node.id] || 0;
+        const effectiveMaxQPS = res.component_effective_max_qps?.[node.id] || 0;
 
         return {
           ...node,
@@ -341,6 +403,7 @@ function App() {
             load: isActiveNode ? nodeLoad : 0,
             active: isActiveNode,
             crashed: isCrashed || node.data.crashed,
+            effectiveMaxQPS: effectiveMaxQPS,
             properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
             onDelete: deleteNode,
             onRestart: restartNode
@@ -399,6 +462,16 @@ function App() {
               <span className="metric">即時 QPS: {evaluationResult.total_qps}</span>
             </div>
           )}
+
+          {/* 自動排版按鈕 */}
+          <button
+            className="btn-primary"
+            onClick={() => onLayout('LR')}
+            title="自動排版 (Auto Layout)"
+          >
+            <Layout size={16} /> 自動排版
+          </button>
+
           <button
             className={`btn-primary ${isAutoEvaluating ? 'active' : 'warning'}`}
             onClick={() => setIsAutoEvaluating(!isAutoEvaluating)}
@@ -635,4 +708,10 @@ function App() {
   );
 }
 
-export default App;
+export default function App() {
+  return (
+    <ReactFlowProvider>
+      <Game />
+    </ReactFlowProvider>
+  );
+}

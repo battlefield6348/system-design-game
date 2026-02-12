@@ -378,7 +378,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		CreatedAt:           time.Now().Unix(),
 		ActiveComponentIDs:  activeIDs,
 		CrashedComponentIDs: crashedIDs,
-		ComponentLoads:      compLoads, // 前端會用這個來顯示每個 node 的 load
+		ComponentLoads:           compLoads,
+		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
 	}, nil
 }
 
