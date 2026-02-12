@@ -95,8 +95,24 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		maxQPS := getCompMaxQPS(comp)
 
+
 		// 判斷是否新發生崩潰 (1.5 倍負載)
-		if maxQPS > 0 && inputQPS > int64(float64(maxQPS)*1.5) {
+		// 加入 Grace Period 機制：如果剛重啟不到 5 秒，則暫時免疫崩潰
+		// 這模擬了系統冷啟動時的保護機制，或是為了讓維運人員有時間處理
+		isGracePeriod := false
+		if restartedAt, ok := comp.Properties["restartedAt"].(float64); ok {
+			// restartedAt 是前端傳來的 gameTime (秒)
+			// 我們比較 elapsedSeconds 與 restartedAt 的差距
+			if float64(elapsedSeconds)-restartedAt < 5.0 {
+				isGracePeriod = true
+			}
+		} else if restartedAt, ok := comp.Properties["restartedAt"].(int64); ok {
+			if elapsedSeconds-restartedAt < 5 {
+				isGracePeriod = true
+			}
+		}
+
+		if !isGracePeriod && maxQPS > 0 && inputQPS > int64(float64(maxQPS)*1.5) {
 			crashedNodes[id] = true
 			return
 		}

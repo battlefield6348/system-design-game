@@ -200,13 +200,13 @@ function App() {
           data: {
             ...node.data,
             crashed: false,
-            properties: { ...node.data.properties, crashed: false }
+            properties: { ...node.data.properties, crashed: false, restartedAt: gameTime }
           }
         };
       }
       return node;
     }));
-  }, [setNodes]);
+  }, [setNodes, gameTime]);
 
   useEffect(() => {
     const go = new window.Go();
