@@ -175,7 +175,7 @@ const CustomNode = ({ data, selected, id }) => {
 
             <div className="asg-body">
               {/* 繪製內部自動佈線 */}
-              <svg className="asg-wiring">
+              <svg className="asg-wiring" viewBox="0 0 310 100" preserveAspectRatio="none">
                 {instances.map((_, i) => {
                   const isFirst = i === 0;
                   const isProvisioning = !isFirst && data.properties?.replica_start_times &&
@@ -184,11 +184,11 @@ const CustomNode = ({ data, selected, id }) => {
                   return (
                     <g key={`wire-${i}`}>
                       <path
-                        d={`M 0,50 C 20,50 30,${yPos} 50,${yPos}`}
+                        d={`M 0,50 C 30,50 40,${yPos} 60,${yPos}`}
                         className={`wire-path ${data.active && !isProvisioning ? 'active' : ''} ${isProvisioning ? 'provisioning' : ''}`}
                       />
                       <path
-                        d={`M 255,${yPos} C 275,${yPos} 290,50 310,50`}
+                        d={`M 250,${yPos} C 270,${yPos} 280,50 310,50`}
                         className={`wire-path ${data.active && !isProvisioning ? 'active' : ''}`}
                       />
                     </g>
@@ -300,7 +300,10 @@ const getLayoutedElements = (nodes, edges, direction = 'LR') => {
 
   nodes.forEach((node) => {
     const isASG = node.data.type === 'AUTO_SCALING_GROUP';
-    dagreGraph.setNode(node.id, { width: isASG ? 310 : 260, height: isASG ? 180 : 120 });
+    const replicas = node.data.replicas || 1;
+    // 動態計算高度：Header(40) + Footer(60) + (每台機器高度+Gap 約 65)
+    const asgHeight = isASG ? Math.max(180, 100 + replicas * 65) : 120;
+    dagreGraph.setNode(node.id, { width: isASG ? 310 : 260, height: asgHeight });
   });
 
   edges.forEach((edge) => {
@@ -319,7 +322,7 @@ const getLayoutedElements = (nodes, edges, direction = 'LR') => {
       // so it matches the React Flow node anchor point (top left).
       position: {
         x: nodeWithPosition.x - (node.data.type === 'AUTO_SCALING_GROUP' ? 310 : 260) / 2,
-        y: nodeWithPosition.y - (node.data.type === 'AUTO_SCALING_GROUP' ? 180 : 120) / 2,
+        y: nodeWithPosition.y - (node.data.type === 'AUTO_SCALING_GROUP' ? Math.max(180, 100 + (node.data.replicas || 1) * 65) : 120) / 2,
       },
     };
 

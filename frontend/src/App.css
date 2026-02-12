@@ -945,26 +945,31 @@ body {
 }
 
 .asg-instance-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 15px;
   position: relative;
   z-index: 1;
-  padding: 4px 50px;
-  /* 避開左右兩側的 SVG 路徑起點 */
+  padding: 10px 65px;
+  height: 100%;
+  box-sizing: border-box;
 }
 
 .server-card {
+  min-height: 42px;
   background: rgba(30, 41, 59, 0.9);
   border: 1px solid rgba(14, 165, 233, 0.3);
   border-radius: 8px;
-  padding: 8px;
+  padding: 8px 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  gap: 12px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
   transition: all 0.3s ease;
+  flex-shrink: 0;
 }
+
 
 .server-card.active {
   border-color: #22c55e;

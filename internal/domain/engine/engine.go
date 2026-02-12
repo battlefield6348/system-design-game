@@ -274,7 +274,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		// 崩潰閾值設定
 		crashThreshold := 1.5
-		if comp.Type == component.MessageQueue || comp.Type == component.ObjectStorage {
+		if comp.Type == component.AutoScalingGroup {
+			crashThreshold = 3.0 // ASG 具有一定的彈性緩衝，允許短暫過載以等待機器啟動
+		} else if comp.Type == component.MessageQueue || comp.Type == component.ObjectStorage {
 			crashThreshold = 50.0 // MQ 和 ObjectStorage 非常難以崩潰
 		} else if comp.Type == component.LoadBalancer || comp.Type == component.CDN || comp.Type == component.WAF {
 			crashThreshold = 5.0 // Infra 組件相對耐用
