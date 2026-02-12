@@ -15,7 +15,7 @@ import {
   useHandleConnections,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search } from 'lucide-react';
 import './App.css';
 
 // 自定義連線組件 (帶有刪除按鈕)
@@ -145,7 +145,9 @@ const CustomNode = ({ data, selected, id }) => {
         className={isTargetLimited || isCrashed ? 'handle-limited' : ''}
       />
       <div className="node-content">
-        <Icon size={20} />
+        <div className="node-icon-wrapper">
+          <Icon size={40} />
+        </div>
         <div className="node-info">
           <div className="node-name">{data.label}</div>
           <div className="node-type">{data.type}</div>
@@ -544,6 +546,8 @@ function App() {
                       {selectedNode.data.type === 'WEB_SERVER' && "提示：單機 QPS 上限，超過會導致崩潰或延遲。"}
                       {selectedNode.data.type === 'CDN' && "提示：CDN 可快取靜態資源，大幅降低 Origin 負載 (約 80%)。"}
                       {selectedNode.data.type === 'WAF' && "提示：WAF 用於過濾惡意流量，保護後端安全。"}
+                      {selectedNode.data.type === 'OBJECT_STORAGE' && "提示：高持久性的物件儲存服務 (如 S3)，幾乎不會崩潰。"}
+                      {selectedNode.data.type === 'SEARCH_ENGINE' && "提示：專門處理全文搜索請求，比資料庫更適合大量讀取。"}
                     </div>
                   </div>
                 );
@@ -570,6 +574,12 @@ function App() {
                 </button>
                 <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 10000 })}>
                   <Plus size={14} /> Redis 快取
+                </button>
+                <button onClick={() => addComponent('SEARCH_ENGINE', '搜尋引擎 (ES)', Search, { max_qps: 2000 })}>
+                  <Plus size={14} /> 搜尋引擎 (ES)
+                </button>
+                <button onClick={() => addComponent('OBJECT_STORAGE', '物件儲存 (S3)', HardDrive, { max_qps: 100000 })}>
+                  <Plus size={14} /> 物件儲存 (S3)
                 </button>
                 <button onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 5000 })}>
                   <Plus size={14} /> 訊息佇列 (MQ)

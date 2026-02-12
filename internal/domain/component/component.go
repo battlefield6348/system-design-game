@@ -12,6 +12,8 @@ const (
 	MessageQueue  Type = "MESSAGE_QUEUE"
 	CDN           Type = "CDN"
 	WAF           Type = "WAF"
+	ObjectStorage Type = "OBJECT_STORAGE"
+	SearchEngine  Type = "SEARCH_ENGINE"
 )
 
 // Component 代表系統中的一個最小單位
