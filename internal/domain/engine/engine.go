@@ -2,6 +2,7 @@ package engine
 
 import (
 	"fmt"
+	"math"
 	"system-design-game/internal/domain/component"
 	"system-design-game/internal/domain/design"
 	"system-design-game/internal/domain/evaluation"
@@ -74,7 +75,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)
 
-	// 先估算伺服器總數，用於平攤流量
+	// 先估算伺服器總數
 	serverCount := int64(0)
 	for _, c := range d.Components {
 		if c.Type == component.WebServer {
@@ -82,14 +83,19 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	// 核心模擬邏輯：遞迴計算流量在不同層級的衰減
 	var simulateFlow func(string, int64)
 	simulateFlow = func(id string, inputQPS int64) {
-		if visited[id] || crashedNodes[id] {
+		comp, exists := compMap[id]
+		if !exists || visited[id] {
+			return
+		}
+
+		// 檢查持久性崩潰標記
+		if crashed, ok := comp.Properties["crashed"].(bool); ok && crashed {
+			crashedNodes[id] = true
 			return
 		}
 		
-		comp := compMap[id]
 		maxQPS := int64(0)
 		if v, ok := comp.Properties["max_qps"].(int64); ok {
 			maxQPS = v
@@ -97,7 +103,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			maxQPS = int64(v)
 		}
 
-		// 判斷是否崩潰 (負載過重)
+		// 判斷是否「新發生」崩潰 (負載過重 > 150%)
 		if maxQPS > 0 && inputQPS > int64(float64(maxQPS)*1.5) {
 			crashedNodes[id] = true
 			return
@@ -113,8 +119,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			reachableDatabases[id] = true
 		} else if comp.Type == component.Cache {
 			reachableCaches[id] = true
-			// 關鍵：Cache 會吸收 80% 的讀取請求，只有 20% 會往後傳給 DB
-			outputQPS = int64(float64(inputQPS) * 0.2)
+			outputQPS = int64(float64(inputQPS) * 0.2) // 80% Cache Hit
 		}
 
 		for _, nextID := range adj[id] {
@@ -123,11 +128,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	for _, root := range roots {
-		// 流量來源自身不消耗 QPS
 		compLoads[root] = currentQPS
 		visited[root] = true
 		for _, firstID := range adj[root] {
-			// 如果流量來源接的是 WebServer，則平攤流量
 			initialQPS := currentQPS
 			if compMap[firstID].Type == component.WebServer && serverCount > 0 {
 				initialQPS = currentQPS / serverCount
@@ -136,27 +139,32 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	// 5. 計算總容量 (用於健康度評估)
+	// 5. 計算總容量與系統擁塞因子 (用於 Latency 模擬)
 	var serverCapacity int64
 	for id := range reachableWebServers {
-		comp := compMap[id]
-		if v, ok := comp.Properties["max_qps"].(int64); ok {
-			serverCapacity += v
-		} else if v, ok := comp.Properties["max_qps"].(float64); ok {
-			serverCapacity += int64(v)
-		}
+		serverCapacity += getCompMaxQPS(compMap[id])
 	}
 	var dbCapacity int64
 	for id := range reachableDatabases {
-		comp := compMap[id]
-		if v, ok := comp.Properties["max_qps"].(int64); ok {
-			dbCapacity += v
-		} else if v, ok := comp.Properties["max_qps"].(float64); ok {
-			dbCapacity += int64(v)
+		dbCapacity += getCompMaxQPS(compMap[id])
+	}
+
+	// 擁塞因子模擬：如果有組件負載 > 80%，延遲開始上升
+	congestionFactor := 1.0
+	for id, load := range compLoads {
+		maxQPS := getCompMaxQPS(compMap[id])
+		if maxQPS > 0 {
+			utilization := float64(load) / float64(maxQPS)
+			if utilization > 0.8 {
+				// M/M/1 排隊理論簡化版：1 / (1 - utilization)
+				factor := 1.0 / (1.1 - utilization)
+				if factor > congestionFactor {
+					congestionFactor = factor
+				}
+			}
 		}
 	}
 
-	// 如果有 Cache 存在於路徑中，提升 DB 的「效應容量」
 	effectiveDBCapacity := dbCapacity
 	if len(reachableCaches) > 0 {
 		effectiveDBCapacity = dbCapacity * 5
@@ -170,7 +178,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		totalCapacity = 0
 	}
 
-	// 6. 計算錯誤率與健康度
+	// 6. 計算指標
 	errorRate := 0.0
 	if currentQPS > totalCapacity && totalCapacity > 0 {
 		errorRate = float64(currentQPS-totalCapacity) / float64(currentQPS)
@@ -179,21 +187,28 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 	health := (1.0 - errorRate) * 100.0
 
+	// 延遲模擬：基礎 50ms * 擁塞因子
+	avgLatency := 50.0 * congestionFactor
+	if avgLatency > 2000.0 {
+		avgLatency = 2000.0 // 上限 2 秒
+	}
+
 	bottleneck := "伺服器"
 	if len(reachableDatabases) > 0 && effectiveDBCapacity < serverCapacity {
 		bottleneck = "資料庫"
 	}
 
 	scores := []evaluation.Score{
-		{Dimension: "Topology", Value: float64(len(reachableWebServers)) * 10, Comment: fmt.Sprintf("有效連接伺服器: %d 台", len(reachableWebServers))},
-		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("瓶頸: %s (有效上限 %d, 當前 %d QPS)", bottleneck, totalCapacity, currentQPS)},
+		{Dimension: "Topology", Value: float64(len(reachableWebServers)) * 10, Comment: fmt.Sprintf("活躍伺服器: %d 台", len(reachableWebServers))},
+		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("瓶頸: %s (上限 %d, 需求 %d QPS)", bottleneck, totalCapacity, currentQPS)},
+		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-50)/5), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
 	}
 
-	activeIDs := make([]string, 0)
+	activeIDs := make([]string, 0, len(visited))
 	for id := range visited {
 		activeIDs = append(activeIDs, id)
 	}
-	crashedIDs := make([]string, 0)
+	crashedIDs := make([]string, 0, len(crashedNodes))
 	for id := range crashedNodes {
 		crashedIDs = append(crashedIDs, id)
 	}
@@ -204,7 +219,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		TotalScore:    health,
 		Scores:        scores,
 		Passed:        health >= 80,
-		AvgLatencyMS:  50.0 + (errorRate * 500.0),
+		AvgLatencyMS:  avgLatency,
 		ErrorRate:     errorRate,
 		TotalQPS:      currentQPS,
 		CreatedAt:     time.Now().Unix(),
@@ -212,4 +227,13 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		CrashedComponentIDs: crashedIDs,
 		ComponentLoads:      compLoads,
 	}, nil
+}
+
+func getCompMaxQPS(comp component.Component) int64 {
+	if v, ok := comp.Properties["max_qps"].(int64); ok {
+		return v
+	} else if v, ok := comp.Properties["max_qps"].(float64); ok {
+		return int64(v)
+	}
+	return 0
 }
