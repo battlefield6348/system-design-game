@@ -30,7 +30,8 @@
 ## 開發準則
 
 - 所有業務規範應定義在 `domain` 層。
-- 註解使用 **繁體中文**。
+- **溝通與註解**：全程使用 **繁體中文**。
+- **Git 規範**：Git Commit Message 必須使用 **繁體中文** 撰寫，保持風格統一。
 - 遵循 Go Module 標準。
 - **單人優先**：專注於設計評估邏輯 (Evaluation Engine)，確保其能準確反映系統設計品質。
 
@@ -38,4 +39,5 @@
 
 1. **編譯 Wasm**: 執行 `make build-wasm`。
 2. **開發模式**: 執行 `make dev-frontend`。
-3. **部署**: 執行 `make build-all`，並將 `frontend/dist` 目錄提交至 `gh-pages` 分支。
+3. **編譯生產環境**: 執行 `make build-all` (產物將輸出至根目錄的 `docs` 資料夾)。
+4. **GitHub 部署**: 將 `docs` 資料夾提交至 `main` 分支，並在 GitHub Settings 中將 Pages Source 設定為 `/docs`。
