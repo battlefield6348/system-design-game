@@ -209,7 +209,7 @@ const CustomNode = ({ data, selected, id }) => {
                       <Server size={18} />
                       <div className="server-info">
                         <span className="server-id">Node {i + 1}</span>
-                        <div className="server-qps-pill">{currentFullfilledLoad.toFixed(0)} QPS</div>
+                        <div className="server-qps-pill">{(currentFullfilledLoad || 0).toFixed(0)} QPS</div>
                       </div>
                       {isProvisioning && <div className="booting-spinner"></div>}
                     </div>
@@ -220,7 +220,7 @@ const CustomNode = ({ data, selected, id }) => {
 
             <div className="asg-footer">
               <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
-                總負載: {data.load.toFixed(0)} / {displayMaxQPS} QPS
+                總負載: {(data.load || 0).toFixed(0)} / {displayMaxQPS} QPS
               </div>
             </div>
           </div>
@@ -251,7 +251,7 @@ const CustomNode = ({ data, selected, id }) => {
               <div className="node-type">{data.type}</div>
               {data.load !== undefined && (
                 <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
-                  {isCrashed ? '0' : data.load.toFixed(0)}
+                  {isCrashed ? '0' : (data.load || 0).toFixed(0)}
                   {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
                 </div>
               )}
@@ -604,7 +604,7 @@ function Game() {
 
           {evaluationResult && (
             <div className="live-metrics">
-              <span className="metric" title="成功獲取資料的請求比例">成功率: {evaluationResult.total_score.toFixed(1)}%</span>
+              <span className="metric" title="成功獲取資料的請求比例">成功率: {(evaluationResult.total_score || 0).toFixed(1)}%</span>
               <span className="metric">取得資料: {evaluationResult.fulfilled_qps} / {evaluationResult.total_qps} QPS</span>
             </div>
           )}
@@ -984,7 +984,7 @@ function Game() {
                 <div className="stat-row">
                   <span className="dim">使用者滿意度</span>
                   <span className={`val ${(retentionRate * 100) < 80 ? 'warning' : ''}`}>
-                    {(retentionRate * 100).toFixed(1)}%
+                    {((retentionRate || 0) * 100).toFixed(1)}%
                   </span>
                 </div>
                 {(retentionRate * 100) < 95 && (retentionRate * 100) >= 10 && (
@@ -994,7 +994,7 @@ function Game() {
               {evaluationResult.scores.map((s, i) => (
                 <div key={i} className="score-item">
                   <span className="dim">{s.dimension}</span>
-                  <span className="val">{s.value.toFixed(0)}</span>
+                  <span className="val">{(s.value || 0).toFixed(0)}</span>
                   <p className="comment">{s.comment}</p>
                 </div>
               ))}
