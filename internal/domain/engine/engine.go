@@ -255,7 +255,22 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		if downstreamCount > 0 {
 			splitQPS := outputQPS / downstreamCount
 			for _, nextID := range adj[id] {
-				propagateFlow(nextID, splitQPS, newPathVisited)
+				finalSplit := splitQPS
+
+				// Message Queue PULL Mode: 限制輸出量到下游的最大容量，防止主動壓垮下游
+				if comp.Type == component.MessageQueue {
+					if mode, ok := comp.Properties["delivery_mode"].(string); ok && mode == "PULL" {
+						downstreamComp, exists := compMap[nextID]
+						if exists {
+							dsMaxCap := getMaxPotentialCapacity(downstreamComp)
+							if dsMaxCap > 0 && finalSplit > dsMaxCap {
+								finalSplit = dsMaxCap
+							}
+						}
+					}
+				}
+
+				propagateFlow(nextID, finalSplit, newPathVisited)
 			}
 		}
 	}
@@ -390,4 +405,20 @@ func getCompMaxQPS(comp component.Component) int64 {
 		return int64(v)
 	}
 	return 0
+}
+
+func getMaxPotentialCapacity(comp component.Component) int64 {
+	base := getCompMaxQPS(comp)
+	if comp.Type == component.WebServer {
+		if auto, ok := comp.Properties["auto_scaling"].(bool); ok && auto {
+			maxReplicas := 5
+			if v, ok := comp.Properties["max_replicas"].(float64); ok {
+				maxReplicas = int(v)
+			} else if v, ok := comp.Properties["max_replicas"].(int64); ok {
+				maxReplicas = int(v)
+			}
+			return base * int64(maxReplicas)
+		}
+	}
+	return base
 }

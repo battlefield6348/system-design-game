@@ -611,6 +611,35 @@ function Game() {
                       </div>
                     )}
 
+                    {/* MQ Specific Settings */}
+                    {selectedNode.data.type === 'MESSAGE_QUEUE' && (
+                      <div className="prop-group">
+                        <label>傳輸模式 (Delivery Mode)</label>
+                        <select
+                          className="metric-input"
+                          style={{ width: '100%', padding: '0.5rem', marginBottom: '0.5rem' }}
+                          value={selectedNode.data.properties.delivery_mode || 'PUSH'}
+                          onChange={(e) => {
+                            setNodes(nds => nds.map(n => {
+                              if (n.id === selectedNode.id) {
+                                return {
+                                  ...n,
+                                  data: {
+                                    ...n.data,
+                                    properties: { ...n.data.properties, delivery_mode: e.target.value }
+                                  }
+                                };
+                              }
+                              return n;
+                            }));
+                          }}
+                        >
+                          <option value="PUSH">Push (主動推送)</option>
+                          <option value="PULL">Pull (被動拉取)</option>
+                        </select>
+                      </div>
+                    )}
+
                     <button className="btn-secondary" onClick={() => setNodes(nds => nds.map(n => ({ ...n, selected: false })))}>
                       關閉設定
                     </button>
