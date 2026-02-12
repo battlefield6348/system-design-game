@@ -167,16 +167,23 @@ const CustomNode = ({ data, selected, id }) => {
               <div className="node-type">AUTO SCALING GROUP ({replicas} Nodes)</div>
             </div>
             <div className="asg-instances">
-              {instances.map((_, i) => (
-                <div key={i} className={`mini-instance ${data.active ? 'active' : ''}`}>
-                  <Server size={20} />
-                </div>
-              ))}
+              {instances.map((_, i) => {
+                // 第一台機器預設是 active，其餘看是否還在 booting
+                const isFirst = i === 0;
+                const isProvisioning = !isFirst && data.properties?.replica_start_times &&
+                  (data.active_time - data.properties.replica_start_times[i - 1] < (data.properties.warmup_seconds || 10));
+                return (
+                  <div key={i} className={`mini-instance ${data.active && !isProvisioning ? 'active' : ''} ${isProvisioning ? 'provisioning' : ''}`}>
+                    <Server size={20} />
+                  </div>
+                );
+              })}
             </div>
             {data.load !== undefined && (
               <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
                 {isCrashed ? '0' : data.load.toFixed(0)}
                 {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
+                {data.replicas > 1 && <span className="replica-label"> ({data.replicas} Nodes)</span>}
               </div>
             )}
           </div>
@@ -358,13 +365,22 @@ function Game() {
   };
 
   const onConnect = useCallback((params) => {
+    // 檢查連線規則：除了 LB，禁止其他組件連向 ASG
+    const sourceNode = nodes.find(n => n.id === params.source);
+    const targetNode = nodes.find(n => n.id === params.target);
+
+    if (targetNode?.data.type === 'AUTO_SCALING_GROUP' && sourceNode?.data.type !== 'LOAD_BALANCER') {
+      alert('架構規範：彈性伸縮組 (ASG) 前端必須接負載平衡器 (LB)！');
+      return;
+    }
+
     const newEdge = {
       ...params,
       type: 'custom',
       data: { onDelete: deleteEdge }
     };
     setEdges((eds) => addEdge(newEdge, eds));
-  }, [setEdges, deleteEdge]);
+  }, [setEdges, deleteEdge, nodes]);
 
   const addComponent = (type, label, icon, properties = {}) => {
     const id = `${type.toLowerCase()}-${Date.now()}`;
@@ -435,7 +451,7 @@ function Game() {
         })
       );
 
-      // 同步更新節點狀態
+      // 同步更新節點狀態並管理 ASG 擴展
       setNodes((nds) => nds.map(node => {
         const isPathActive = res.active_component_ids?.includes(node.id);
         const isActiveNode = isPathActive && isAutoEvaluating;
@@ -444,12 +460,37 @@ function Game() {
         const effectiveMaxQPS = res.component_effective_max_qps?.[node.id] || 0;
         const nodeReplicas = res.component_replicas?.[node.id] || 1;
 
+        let updatedProperties = { ...node.data.properties, crashed: isCrashed || node.data.crashed };
+
+        // ASG 擴展邏輯：記錄新副本的啟動時間
+        if (node.data.type === 'AUTO_SCALING_GROUP' && node.data.properties?.auto_scaling) {
+          const threshold = (node.data.properties.scale_up_threshold || 70) / 100.0;
+          const baseCap = node.data.properties.max_qps || 1000;
+
+          // 計算預期副本數
+          const needed = Math.ceil(nodeLoad / (baseCap * threshold)) || 1;
+          const max = node.data.properties.max_replicas || 5;
+          const target = Math.min(needed, max);
+
+          let startTimes = node.data.properties.replica_start_times || [];
+          // 如果目標增加，則新增啟動時間 (扣除第1台基礎機器)
+          if (target > 1 && startTimes.length < target - 1) {
+            startTimes = [...startTimes, res.created_at];
+          }
+          // 如果負載下降，縮減副本 (Scale In)
+          else if (target < 1 + startTimes.length) {
+            startTimes = startTimes.slice(0, target - 1);
+          }
+          updatedProperties.replica_start_times = startTimes;
+        }
+
         return {
           ...node,
           data: {
             ...node.data,
             load: isActiveNode ? nodeLoad : 0,
             active: isActiveNode,
+            active_time: res.created_at, // 用於判斷暖機進度
             isBurstActive: res.is_burst_active,
             crashed: isCrashed || node.data.crashed,
             effectiveMaxQPS: effectiveMaxQPS,
@@ -616,28 +657,74 @@ function Game() {
                           </label>
                         </div>
                         {selectedNode.data.properties.auto_scaling && (
-                          <div className="prop-group">
-                            <label>最大副本數 (Max Replicas)</label>
-                            <input
-                              type="number"
-                              value={selectedNode.data.properties.max_replicas || 5}
-                              onChange={(e) => {
-                                const val = parseInt(e.target.value) || 1;
-                                setNodes(nds => nds.map(n => {
-                                  if (n.id === selectedNode.id) {
-                                    return {
-                                      ...n,
-                                      data: {
-                                        ...n.data,
-                                        properties: { ...n.data.properties, max_replicas: val }
-                                      }
-                                    };
-                                  }
-                                  return n;
-                                }));
-                              }}
-                            />
-                          </div>
+                          <>
+                            <div className="prop-group">
+                              <label>最大副本數 (Max Replicas)</label>
+                              <input
+                                type="number"
+                                value={selectedNode.data.properties.max_replicas || 5}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 1;
+                                  setNodes(nds => nds.map(n => {
+                                    if (n.id === selectedNode.id) {
+                                      return {
+                                        ...n,
+                                        data: {
+                                          ...n.data,
+                                          properties: { ...n.data.properties, max_replicas: val }
+                                        }
+                                      };
+                                    }
+                                    return n;
+                                  }));
+                                }}
+                              />
+                            </div>
+                            <div className="prop-group">
+                              <label>擴展門檻 (Scaling Threshold: {selectedNode.data.properties.scale_up_threshold || 70}%)</label>
+                              <input
+                                type="range" min="10" max="95"
+                                value={selectedNode.data.properties.scale_up_threshold || 70}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value);
+                                  setNodes(nds => nds.map(n => {
+                                    if (n.id === selectedNode.id) {
+                                      return {
+                                        ...n,
+                                        data: {
+                                          ...n.data,
+                                          properties: { ...n.data.properties, scale_up_threshold: val }
+                                        }
+                                      };
+                                    }
+                                    return n;
+                                  }));
+                                }}
+                              />
+                            </div>
+                            <div className="prop-group">
+                              <label>暖機時間 (Warm-up: {selectedNode.data.properties.warmup_seconds || 10}s)</label>
+                              <input
+                                type="number"
+                                value={selectedNode.data.properties.warmup_seconds || 10}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 1;
+                                  setNodes(nds => nds.map(n => {
+                                    if (n.id === selectedNode.id) {
+                                      return {
+                                        ...n,
+                                        data: {
+                                          ...n.data,
+                                          properties: { ...n.data.properties, warmup_seconds: val }
+                                        }
+                                      };
+                                    }
+                                    return n;
+                                  }));
+                                }}
+                              />
+                            </div>
+                          </>
                         )}
                       </>
                     )}
@@ -744,7 +831,7 @@ function Game() {
                 <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, auto_scaling: false, max_replicas: 5 })}>
                   <Plus size={14} /> 伺服器 (1k QPS)
                 </button>
-                <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5 })}>
+                <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10 })}>
                   <Plus size={14} /> 彈性伸縮組 (ASG)
                 </button>
                 <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>

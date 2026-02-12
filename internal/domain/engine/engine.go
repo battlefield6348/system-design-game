@@ -212,20 +212,48 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				maxReplicas := 5
 				if v, ok := comp.Properties["max_replicas"].(float64); ok {
 					maxReplicas = int(v)
-				} else if v, ok := comp.Properties["max_replicas"].(int64); ok {
-					maxReplicas = int(v)
+				}
+				
+				threshold := 0.7 // 預設 70% 負載就擴展
+				if v, ok := comp.Properties["scale_up_threshold"].(float64); ok {
+					threshold = v / 100.0
 				}
 
-				needed := float64(potentialTotalLoad) / float64(baseMaxQPS)
-				replicas := int(math.Ceil(needed))
-				if replicas > maxReplicas {
-					replicas = maxReplicas
+				warmup := int64(10) // 預設 10 秒暖機
+				if v, ok := comp.Properties["warmup_seconds"].(float64); ok {
+					warmup = int64(v)
 				}
-				if replicas < 1 {
-					replicas = 1
+
+				// 計算目標副本數 (Target Replicas)
+				// 當前的潛在負載 / (單機能力 * 門檻)
+				needed := float64(potentialTotalLoad) / (float64(baseMaxQPS) * threshold)
+				targetReplicas := int(math.Ceil(needed))
+				if targetReplicas > maxReplicas {
+					targetReplicas = maxReplicas
 				}
-				currentMaxQPS = baseMaxQPS * int64(replicas)
-				compReplicas[id] = replicas
+				if targetReplicas < 1 {
+					targetReplicas = 1
+				}
+
+				// 考慮暖機時間 (由前端傳來的啟動時間清單)
+				activeCount := 1
+				bootingCount := 0
+				if startTimes, ok := comp.Properties["replica_start_times"].([]interface{}); ok {
+					for _, tObj := range startTimes {
+						startTime := int64(tObj.(float64))
+						if elapsedSeconds - startTime >= warmup {
+							activeCount++
+						} else {
+							bootingCount++
+						}
+					}
+				}
+				
+				// 確保至少有一台基礎機器 (如果是 ASG 通常至少 1 台)
+				if activeCount < 1 { activeCount = 1 }
+
+				currentMaxQPS = baseMaxQPS * int64(activeCount)
+				compReplicas[id] = activeCount + bootingCount
 			} else {
 				compReplicas[id] = 1
 			}
