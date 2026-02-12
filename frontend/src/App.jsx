@@ -12,6 +12,7 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getBezierPath,
+  useHandleConnections,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 import { Server, Activity, Database, Share2, Plus, Play, X } from 'lucide-react';
@@ -65,6 +66,14 @@ const CustomEdge = ({
 const CustomNode = ({ data, selected, id }) => {
   const Icon = data.icon || Server;
   const isTraffic = data.type === 'TRAFFIC_SOURCE';
+  const isServer = data.type === 'WEB_SERVER';
+
+  // 監控連線數量
+  const connectionsIn = useHandleConnections({ type: 'target', id: 't' });
+  const connectionsOut = useHandleConnections({ type: 'source', id: 's' });
+
+  const isTargetLimited = isServer && connectionsIn.length >= 1;
+  const isSourceLimited = isTraffic && connectionsOut.length >= 1;
 
   return (
     <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''}`}>
@@ -76,20 +85,32 @@ const CustomNode = ({ data, selected, id }) => {
           <X size={12} strokeWidth={3} />
         </div>
       )}
-      <Handle type="target" position={Position.Left} />
+      <Handle
+        id="t"
+        type="target"
+        position={Position.Left}
+        isConnectable={!isTargetLimited}
+        className={isTargetLimited ? 'handle-limited' : ''}
+      />
       <div className="node-content">
         <Icon size={20} />
         <div className="node-info">
           <div className="node-name">{data.label}</div>
           <div className="node-type">{data.type}</div>
           {data.load !== undefined && (
-            <div className="node-stats">
-              {data.load.toFixed(0)} QPS
+            <div className={`node-stats ${isSourceLimited ? 'limited' : ''}`}>
+              {isSourceLimited && isTraffic ? '⚠️ 輸出已達上限' : `${data.load.toFixed(0)} QPS`}
             </div>
           )}
         </div>
       </div>
-      <Handle type="source" position={Position.Right} />
+      <Handle
+        id="s"
+        type="source"
+        position={Position.Right}
+        isConnectable={!isSourceLimited}
+        className={isSourceLimited ? 'handle-limited' : ''}
+      />
     </div>
   );
 };

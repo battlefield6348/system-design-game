@@ -357,3 +357,41 @@ body {
   background: rgba(15, 23, 42, 0.9) !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
 }
+
+/* Handle 狀態 */
+.react-flow__handle {
+  width: 10px;
+  height: 10px;
+  background: #6366f1;
+  border: 2px solid #1e293b;
+  transition: all 0.2s;
+}
+
+.react-flow__handle:hover {
+  width: 14px;
+  height: 14px;
+  background: #818cf8;
+}
+
+/* 當已達連線上限時的樣式 */
+.handle-limited {
+  background: #475569 !important;
+  /* 灰色 */
+  opacity: 0.5;
+  cursor: not-allowed;
+  width: 6px !important;
+  height: 6px !important;
+}
+
+/* 流量來源專屬 Handle 警示 */
+.traffic_source .react-flow__handle-right.handle-limited {
+  background: #f43f5e !important;
+  /* 玫瑰紅 */
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.6);
+}
+
+.node-stats.limited {
+  color: #f43f5e;
+  font-weight: bold;
+}
