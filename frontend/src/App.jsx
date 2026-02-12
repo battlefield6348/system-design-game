@@ -455,7 +455,13 @@ function App() {
           >
             <Background color="#333" gap={20} />
             <Controls />
-            <MiniMap nodeStrokeWidth={3} zoomable pannable />
+            <MiniMap
+              nodeStrokeWidth={3}
+              zoomable
+              pannable
+              nodeColor="#64748b"
+              maskColor="rgba(30, 41, 59, 0.8)"
+            />
           </ReactFlow>
         </section>
       </main>

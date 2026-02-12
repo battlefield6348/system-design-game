@@ -389,21 +389,43 @@ body {
 }
 
 /* 修正控制項與地圖 */
+/* 修正控制項與地圖 */
 .react-flow__controls {
-  background: rgba(30, 41, 59, 0.8) !important;
-  backdrop-filter: blur(4px);
+  background: #1e293b !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  box-shadow: none !important;
+  border-radius: 4px;
+  overflow: hidden;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  padding: 0 !important;
 }
 
 .react-flow__controls-button {
+  background: transparent !important;
+  border: none !important;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+  fill: white !important;
+  color: white !important;
+  width: 28px !important;
+  height: 28px !important;
+  transition: all 0.2s;
+}
+
+.react-flow__controls-button:last-child {
+  border-bottom: none !important;
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+
+.react-flow__controls-button svg {
   fill: white !important;
 }
 
 .react-flow__minimap {
-  background: rgba(15, 23, 42, 0.9) !important;
+  background: #1e293b !important;
   border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  border-radius: 8px;
 }
 
 /* Handle 狀態 */
