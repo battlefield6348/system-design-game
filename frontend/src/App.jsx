@@ -85,9 +85,11 @@ const CustomNode = ({ data, selected, id }) => {
   const isSourceLimited = isTraffic && connectionsOut.length >= 1;
 
   const isOverloaded = data.properties?.max_qps && data.load > data.properties.max_qps;
+  const isCrashed = data.crashed;
 
   return (
-    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
+    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''} ${isCrashed ? 'crashed' : ''}`}>
+      {isCrashed && <div className="crashed-overlay">CRASHED</div>}
       {!isTraffic && (
         <div className="delete-btn" onClick={(e) => {
           e.stopPropagation();
@@ -100,8 +102,8 @@ const CustomNode = ({ data, selected, id }) => {
         id="t"
         type="target"
         position={Position.Left}
-        isConnectable={!isTargetLimited}
-        className={isTargetLimited ? 'handle-limited' : ''}
+        isConnectable={!isTargetLimited && !isCrashed}
+        className={isTargetLimited || isCrashed ? 'handle-limited' : ''}
       />
       <div className="node-content">
         <Icon size={20} />
@@ -110,7 +112,7 @@ const CustomNode = ({ data, selected, id }) => {
           <div className="node-type">{data.type}</div>
           {data.load !== undefined && (
             <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${(data.properties?.max_qps && data.load > data.properties.max_qps) ? 'overloaded' : ''}`}>
-              {data.load.toFixed(0)}
+              {isCrashed ? '0' : data.load.toFixed(0)}
               {data.properties?.max_qps ? ` / ${data.properties.max_qps}` : ''} QPS
             </div>
           )}
@@ -120,8 +122,8 @@ const CustomNode = ({ data, selected, id }) => {
         id="s"
         type="source"
         position={Position.Right}
-        isConnectable={!isSourceLimited}
-        className={isSourceLimited ? 'handle-limited' : ''}
+        isConnectable={!isSourceLimited && !isCrashed}
+        className={isSourceLimited || isCrashed ? 'handle-limited' : ''}
       />
     </div>
   );
@@ -252,21 +254,22 @@ function App() {
 
       // 同步更新節點狀態（僅針對活躍路徑組件顯示負載）
       setNodes((nds) => nds.map(node => {
-        const isActive = res.active_component_ids?.includes(node.id) && isAutoEvaluating;
+        const isPathActive = res.active_component_ids?.includes(node.id);
+        const isActive = isPathActive && isAutoEvaluating;
+        const isCrashed = res.crashed_component_ids?.includes(node.id);
 
         if (node.id === 'traffic-1') {
           return { ...node, data: { ...node.data, load: res.total_qps, active: isAutoEvaluating } };
         }
 
         if (node.data.type === 'WEB_SERVER') {
-          // 僅針對活躍的伺服器平攤 QPS
-          const activeServersCount = nds.filter(n => n.data.type === 'WEB_SERVER' && res.active_component_ids?.includes(n.id)).length;
-          const nodeLoad = isActive ? (res.total_qps / Math.max(1, activeServersCount)) : 0;
-          return { ...node, data: { ...node.data, load: nodeLoad, active: isActive } };
+          const activeServers = nds.filter(n => n.data.type === 'WEB_SERVER' && res.active_component_ids?.includes(n.id) && !res.crashed_component_ids?.includes(n.id));
+          const nodeLoad = (isActive && !isCrashed) ? (res.total_qps / Math.max(1, activeServers.length)) : 0;
+          return { ...node, data: { ...node.data, load: nodeLoad, active: isActive, crashed: isCrashed } };
         }
 
-        // 其他組件（LB, DB, Cache 等）若在路徑上，顯示總 QPS
-        return { ...node, data: { ...node.data, active: isActive, load: isActive ? res.total_qps : 0 } };
+        // 其他組件（LB, DB, Cache 等）
+        return { ...node, data: { ...node.data, load: (isActive && !isCrashed) ? res.total_qps : 0, active: isActive, crashed: isCrashed } };
       }));
     } catch (e) {
       console.error("解析評估結果失敗:", e);

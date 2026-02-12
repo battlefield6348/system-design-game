@@ -469,3 +469,37 @@ body {
   animation: node-shake 0.3s infinite !important;
   box-shadow: 0 0 20px rgba(255, 77, 77, 0.6) !important;
 }
+
+/* 系統崩潰：灰暗且死寂的狀態 */
+.custom-node.crashed {
+  filter: grayscale(0.8) brightness(0.7);
+  border: 2px solid #ff4d4d !important;
+  animation: border-flash 1s infinite alternate;
+  pointer-events: none;
+  /* 崩潰時暫時無法操作 */
+  background: rgba(0, 0, 0, 0.6) !important;
+}
+
+@keyframes border-flash {
+  from {
+    box-shadow: 0 0 5px #ff4d4d;
+  }
+
+  to {
+    box-shadow: 0 0 20px #ff4d4d, inset 0 0 10px #ff4d4d;
+  }
+}
+
+.crashed-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #ff4d4d;
+  font-weight: 900;
+  font-size: 1.2rem;
+  z-index: 20;
+  white-space: nowrap;
+  text-shadow: 0 0 10px black;
+  letter-spacing: 2px;
+}

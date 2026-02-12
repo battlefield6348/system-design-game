@@ -54,15 +54,28 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	visited := make(map[string]bool)
 	reachableWebServers := make(map[string]bool)
 	reachableDatabases := make(map[string]bool)
+	crashedNodes := make(map[string]bool)
+	
+	// 先判斷哪些組件「操爆了」 (負載持續超過 1.5 倍上限)
+	// 這裡簡化邏輯：如果當前流量分配到該組件超過 1.5 倍，它就掛了
+	// 為了精確度，我們需要先知道目前大概的 QPS (從前端傳入或預計)
 	
 	var traverse func(string)
 	traverse = func(id string) {
-		if visited[id] {
+		if visited[id] || crashedNodes[id] {
 			return
 		}
 		visited[id] = true
 		
 		comp := compMap[id]
+		
+		// 檢查是否操爆 (150% 負載)
+		// 註：這是一個簡化模擬，實際應追蹤持續時間
+		if maxQPS, ok := comp.Properties["max_qps"].(float64); ok && maxQPS > 0 {
+			// 如果流量已經大到讓平均每台伺服器負載 > 1.5倍，或者這是單一點
+			// 此處模擬「系統直接掛掉」的臨界點
+		}
+
 		if comp.Type == component.WebServer {
 			reachableWebServers[id] = true
 		}
@@ -124,10 +137,73 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		currentQPS = phase.EndQPS
 	}
 
-	// 如果超過所有階段，維持在最後一個階段的 EndQPS
-	if currentQPS == 0 && len(s.Phases) > 0 {
-		currentQPS = s.Phases[len(s.Phases)-1].EndQPS
+	// 操爆機制預判：計算各節點的預估負載
+	// 如果節點是端點 (如 Database) 且流量 > 1.5 * max_qps，標記為崩潰
+	for id, comp := range compMap {
+		if comp.Type == component.TrafficSource {
+			continue
+		}
+		
+		maxQPS := int64(0)
+		if v, ok := comp.Properties["max_qps"].(int64); ok {
+			maxQPS = v
+		} else if v, ok := comp.Properties["max_qps"].(float64); ok {
+			maxQPS = int64(v)
+		}
+
+		if maxQPS > 0 {
+			// 簡單估算：如果是資料庫，承擔總流量；如果是網頁伺服器，按數量平攤
+			load := int64(0)
+			if comp.Type == component.Database {
+				load = currentQPS
+			} else if comp.Type == component.WebServer {
+				// 這裡簡化，假設總共有 N 台伺服器
+				serverCount := int64(0)
+				for _, c := range d.Components {
+					if c.Type == component.WebServer {
+						serverCount++
+					}
+				}
+				if serverCount > 0 {
+					load = currentQPS / serverCount
+				}
+			}
+
+			if load > int64(float64(maxQPS)*1.5) {
+				crashedNodes[id] = true
+			}
+		}
 	}
+
+	// 重新執行尋路 (考慮崩潰節點的可達性)
+	visited = make(map[string]bool)
+	reachableWebServers = make(map[string]bool)
+	reachableDatabases = make(map[string]bool)
+	for _, root := range roots {
+		traverse(root)
+	}
+
+	// 重新計算有效容量 (扣除崩潰節點後的實際剩下可運作容量)
+	var finalServerCap int64
+	for id := range reachableWebServers {
+		finalServerCap += getCompMaxQPS(id)
+	}
+	var finalDBCap int64
+	for id := range reachableDatabases {
+		finalDBCap += getCompMaxQPS(id)
+	}
+
+	totalCapacity = finalServerCap
+	if len(reachableDatabases) > 0 && finalDBCap < totalCapacity {
+		totalCapacity = finalDBCap
+	}
+	if len(reachableWebServers) == 0 {
+		totalCapacity = 0
+	}
+
+	// 更新各層級最終容量供後續計算使用
+	serverCapacity = finalServerCap
+	dbCapacity = finalDBCap
 
 	// 計算錯誤率
 	errorRate := 0.0
@@ -155,6 +231,12 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		activeIDs = append(activeIDs, id)
 	}
 
+	// 收集所有崩潰的組件 ID
+	crashedIDs := make([]string, 0)
+	for id := range crashedNodes {
+		crashedIDs = append(crashedIDs, id)
+	}
+
 	passed := health >= 80
 
 	return &evaluation.Result{
@@ -167,6 +249,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ErrorRate:     errorRate,
 		TotalQPS:      currentQPS,
 		CreatedAt:     time.Now().Unix(),
-		ActiveComponentIDs: activeIDs,
+		ActiveComponentIDs:  activeIDs,
+		CrashedComponentIDs: crashedIDs,
 	}, nil
 }
