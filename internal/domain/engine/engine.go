@@ -119,7 +119,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("有效總容量: %d QPS, 當前流量: %d QPS", totalCapacity, currentQPS)},
 	}
 
-	// 收集所有流量可達的活躍組件 ID
+	// 收集所有流量可達的活躍組件 ID (包含路徑上的所有組件)
 	activeIDs := make([]string, 0)
 	for id := range visited {
 		activeIDs = append(activeIDs, id)

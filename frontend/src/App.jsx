@@ -143,7 +143,7 @@ function App() {
 
   useEffect(() => {
     const go = new window.Go();
-    WebAssembly.instantiateStreaming(fetch("/main.wasm"), go.importObject).then((result) => {
+    WebAssembly.instantiateStreaming(fetch("main.wasm"), go.importObject).then((result) => {
       go.run(result.instance);
       setIsWasmLoaded(true);
       // 初始化一個測試場景
