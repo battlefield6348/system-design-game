@@ -89,7 +89,30 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 	
 	// 加上使用者設定的初始流量
-	currentQPS += baseQPS
+	totalBaseQPS := currentQPS + baseQPS
+
+	// 加上隨機波動 (Fluctuation)
+	// 使用 Sine 波模擬自然波動 (±5%)
+	fluctuation := 1.0 + 0.05*math.Sin(float64(elapsedSeconds)/5.0)
+
+	// 隨機驟降事件 (Unknown random drops)
+	isRandomDrop := false
+	// 每 15 秒判定一次，有 10% 機率發生 40% 的驟降，持續 3 秒
+	if (elapsedSeconds/15)%10 == 7 && elapsedSeconds%15 < 3 {
+		fluctuation *= 0.6
+		isRandomDrop = true
+	}
+
+	// 使用者留存率 (User Churn / Retention)
+	retentionRate := 1.0
+	if d.Properties != nil {
+		if v, ok := d.Properties["retention_rate"].(float64); ok {
+			retentionRate = v
+		}
+	}
+
+	// 最終實際流量
+	currentQPS = int64(float64(totalBaseQPS) * fluctuation * retentionRate)
 
 	// 4. 核心物理流量模擬：計算負載與截斷
 	visited := make(map[string]bool)
@@ -400,6 +423,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
 		IsBurstActive:           isBurstActive,
 		ComponentReplicas:       compReplicas,
+		RetentionRate:           retentionRate,
+		IsRandomDrop:            isRandomDrop,
 	}, nil
 }
 

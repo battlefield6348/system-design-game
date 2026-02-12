@@ -270,6 +270,7 @@ function Game() {
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
+  const [retentionRate, setRetentionRate] = useState(1.0);
 
   const deleteNode = useCallback((id) => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
@@ -335,7 +336,7 @@ function Game() {
       }, 1000);
     }
     return () => clearInterval(interval);
-  }, [isWasmLoaded, isAutoEvaluating, nodes, edges]);
+  }, [isWasmLoaded, isAutoEvaluating, nodes, edges, retentionRate]); // Added retentionRate to deps
 
   const initDefaultDesign = () => {
     const initialNodes = [
@@ -393,7 +394,8 @@ function Game() {
         from_id: e.source,
         to_id: e.target,
         protocol: "HTTP"
-      }))
+      })),
+      properties: { retention_rate: retentionRate }
     };
 
     // 同步到 Wasm
@@ -404,6 +406,19 @@ function Game() {
     try {
       const res = JSON.parse(resultStr);
       setEvaluationResult(res);
+
+      // 使用者留存率衰減與恢復邏輯
+      setRetentionRate(prev => {
+        let next = prev;
+        if (res.total_score < 95) {
+          // 系統健康度低於 95%，使用者開始流失 (-0.5% / sec)
+          next -= 0.005;
+        } else {
+          // 系統健康度恢復，使用者慢慢回歸 (+0.2% / sec)
+          next += 0.002;
+        }
+        return Math.min(1.0, Math.max(0.1, next));
+      });
 
       // 動態更新連線動畫：只要系統健康度大於 0 且正在模擬就讓它流動
       const isActive = res.total_score > 0 && isAutoEvaluating;
@@ -500,6 +515,10 @@ function Game() {
 
           {evaluationResult?.is_burst_active && (
             <div className="burst-badge">BURSTING!</div>
+          )}
+
+          {evaluationResult?.is_random_drop && (
+            <div className="drop-badge">UNSTABLE!</div>
           )}
 
           {/* 自動排版按鈕 */}
@@ -759,6 +778,17 @@ function Game() {
           {evaluationResult && (
             <div className="eval-details">
               <h4>系統診斷報告</h4>
+              <div className="global-stats">
+                <div className="stat-row">
+                  <span className="dim">使用者滿意度</span>
+                  <span className={`val ${(retentionRate * 100) < 80 ? 'warning' : ''}`}>
+                    {(retentionRate * 100).toFixed(1)}%
+                  </span>
+                </div>
+                {(retentionRate * 100) < 95 && (retentionRate * 100) >= 10 && (
+                  <p className="churn-hint">提示：系統不穩定導致使用者流失中...</p>
+                )}
+              </div>
               {evaluationResult.scores.map((s, i) => (
                 <div key={i} className="score-item">
                   <span className="dim">{s.dimension}</span>
