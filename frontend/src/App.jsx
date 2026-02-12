@@ -31,6 +31,7 @@ const CustomEdge = ({
   markerEnd,
   data,
 }) => {
+  const [isHovered, setIsHovered] = useState(false);
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -41,19 +42,27 @@ const CustomEdge = ({
   });
 
   return (
-    <>
-      {/* 隱形寬路徑：增加滑鼠感應範圍 (20px 寬) */}
+    <g
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      className="custom-edge-group"
+    >
+      {/* 隱形寬路徑：增加滑鼠感應範圍 (25px 寬) */}
       <path
         d={edgePath}
         fill="none"
         stroke="transparent"
-        strokeWidth={20}
+        strokeWidth={25}
         className="react-flow__edge-interaction"
         style={{ cursor: 'pointer', pointerEvents: 'all' }}
       />
       {/* 底層實線 */}
-      <BaseEdge path={edgePath} markerEnd={markerEnd} style={{ ...style, stroke: '#334155', strokeWidth: 2 }} />
-      {/* 頂層流動脈衝 (僅在 animated 時顯示) */}
+      <BaseEdge
+        path={edgePath}
+        markerEnd={markerEnd}
+        style={{ ...style, stroke: isHovered ? '#818cf8' : '#334155', strokeWidth: isHovered ? 4 : 2 }}
+      />
+      {/* 頂層流動脈衝 */}
       {data?.animated && (
         <BaseEdge
           path={edgePath}
@@ -67,8 +76,12 @@ const CustomEdge = ({
             position: 'absolute',
             transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
             pointerEvents: 'all',
+            opacity: isHovered ? 1 : 0,
+            scale: isHovered ? 1 : 0.5,
+            transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+            zIndex: 1000,
           }}
-          className="edge-button-container nodrag nopan"
+          className="nodrag nopan"
         >
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
             <div className="edge-delete-inner">
@@ -78,7 +91,7 @@ const CustomEdge = ({
           </button>
         </div>
       </EdgeLabelRenderer>
-    </>
+    </g>
   );
 };
 
