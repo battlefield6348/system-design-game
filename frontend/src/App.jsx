@@ -345,6 +345,33 @@ function Game() {
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
   const [retentionRate, setRetentionRate] = useState(1.0);
+
+  const deleteNode = useCallback((id) => {
+    setNodes((nds) => nds.filter((node) => node.id !== id));
+    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
+  }, [setNodes, setEdges]);
+
+  const deleteEdge = useCallback((id) => {
+    setEdges((eds) => eds.filter((edge) => edge.id !== id));
+  }, [setEdges]);
+
+  // 重啟崩潰節點
+  const restartNode = useCallback((id) => {
+    setNodes((nds) => nds.map(node => {
+      if (node.id === id) {
+        return {
+          ...node,
+          data: {
+            ...node.data,
+            crashed: false,
+            properties: { ...node.data.properties, crashed: false, restartedAt: gameTime }
+          }
+        };
+      }
+      return node;
+    }));
+  }, [setNodes, gameTime]);
+
   const [clipboardNode, setClipboardNode] = useState(null);
 
   const onCopy = useCallback(() => {
@@ -408,31 +435,6 @@ function Game() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [onCopy, onPaste, nodes, onNodesDelete]);
 
-  const deleteNode = useCallback((id) => {
-    setNodes((nds) => nds.filter((node) => node.id !== id));
-    setEdges((eds) => eds.filter((edge) => edge.source !== id && edge.target !== id));
-  }, [setNodes, setEdges]);
-
-  const deleteEdge = useCallback((id) => {
-    setEdges((eds) => eds.filter((edge) => edge.id !== id));
-  }, [setEdges]);
-
-  // 重啟崩潰節點
-  const restartNode = useCallback((id) => {
-    setNodes((nds) => nds.map(node => {
-      if (node.id === id) {
-        return {
-          ...node,
-          data: {
-            ...node.data,
-            crashed: false,
-            properties: { ...node.data.properties, crashed: false, restartedAt: gameTime }
-          }
-        };
-      }
-      return node;
-    }));
-  }, [setNodes, gameTime]);
 
   const onLayout = useCallback((direction) => {
     const { nodes: layoutedNodes, edges: layoutedEdges } = getLayoutedElements(
