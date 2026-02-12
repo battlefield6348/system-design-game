@@ -84,10 +84,7 @@ const CustomEdge = ({
           className="nodrag nopan"
         >
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
-            <div className="edge-delete-inner">
-              <X size={14} strokeWidth={3} />
-              <span className="edge-delete-text">刪除</span>
-            </div>
+            <X size={12} strokeWidth={4} />
           </button>
         </div>
       </EdgeLabelRenderer>
