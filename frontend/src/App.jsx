@@ -495,7 +495,7 @@ function Game() {
             crashed: isCrashed || node.data.crashed,
             effectiveMaxQPS: effectiveMaxQPS,
             replicas: nodeReplicas,
-            properties: { ...node.data.properties, crashed: isCrashed || node.data.crashed },
+            properties: updatedProperties,
             onDelete: deleteNode,
             onRestart: restartNode
           }
