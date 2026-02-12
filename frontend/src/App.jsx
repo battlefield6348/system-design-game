@@ -722,6 +722,7 @@ function Game() {
               </div>
               {(() => {
                 const selectedNode = nodes.find(n => n.selected);
+                const isASG = selectedNode?.data.type === 'AUTO_SCALING_GROUP';
                 return (
                   <div className="props-form">
                     <div className="prop-group">
