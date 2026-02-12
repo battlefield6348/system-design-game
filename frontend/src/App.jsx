@@ -450,7 +450,10 @@ function App() {
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
-            selectionOnDrag={true}
+            selectionOnDrag={true} // 允許左鍵直接框選
+            selectionKeyCode={null} // 不需要按住任何鍵即可框選
+            panOnDrag={[1, 2]} // 改為中鍵或右鍵平移畫布，左鍵留給框選
+            panOnScroll={true} // 允許滾輪平移
             selectionMode="partial"
           >
             <Background color="#333" gap={20} />
