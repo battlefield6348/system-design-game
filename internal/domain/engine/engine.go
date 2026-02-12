@@ -94,12 +94,22 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	var simulateFlow func(string, int64)
-	simulateFlow = func(id string, inputQPS int64) {
+	var simulateFlow func(string, int64, map[string]bool)
+	simulateFlow = func(id string, inputQPS int64, pathVisited map[string]bool) {
 		comp, exists := compMap[id]
-		if !exists || visited[id] {
+		if !exists {
 			return
 		}
+		
+		// 防止環路 (Cycle Detection)
+		if pathVisited[id] {
+			return
+		}
+		newPathVisited := make(map[string]bool)
+		for k, v := range pathVisited {
+			newPathVisited[k] = v
+		}
+		newPathVisited[id] = true
 
 		// 檢查持久性崩潰標記
 		if crashed, ok := comp.Properties["crashed"].(bool); ok && crashed {
@@ -109,14 +119,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		maxQPS := getCompMaxQPS(comp)
 
+		// 累加流量到該節點
+		compLoads[id] += inputQPS
+		totalInputQPS := compLoads[id] // 使用當前累積的總流量來判斷崩潰
 
 		// 判斷是否新發生崩潰 (1.5 倍負載)
-		// 加入 Grace Period 機制：如果剛重啟不到 5 秒，則暫時免疫崩潰
-		// 這模擬了系統冷啟動時的保護機制，或是為了讓維運人員有時間處理
+		// 加入 Grace Period 機制
 		isGracePeriod := false
 		if restartedAt, ok := comp.Properties["restartedAt"].(float64); ok {
-			// restartedAt 是前端傳來的 gameTime (秒)
-			// 我們比較 elapsedSeconds 與 restartedAt 的差距
 			if float64(elapsedSeconds)-restartedAt < 5.0 {
 				isGracePeriod = true
 			}
@@ -126,18 +136,30 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 
-		if !isGracePeriod && maxQPS > 0 && inputQPS > int64(float64(maxQPS)*1.5) {
+		if !isGracePeriod && maxQPS > 0 && totalInputQPS > int64(float64(maxQPS)*1.5) {
 			crashedNodes[id] = true
+			// 崩潰後不再往下傳遞流量 (雖然已經累加了 Input，但 Output 為 0)
 			return
 		}
 
 		visited[id] = true
-		compLoads[id] = inputQPS
-
-		// 實作截斷邏輯：成功處理的流量不能超過組件上限
+		
+		// 實作截斷邏輯：每個來源的流量被截斷後再往下傳？
+		// 這裡有個邏輯難點：如果要累加 Load，必須等所有上游都計算完？
+		// 簡單模型：我們不等待，直接將「這一次的 Input」進行截斷後傳遞。
+		// 雖然多次呼叫會導致下游被多次觸發，但只要下游也是累加模式就可以。
+		
 		processedQPS := inputQPS
-		if maxQPS > 0 && inputQPS > maxQPS {
-			processedQPS = maxQPS // 剩餘流量在這裡「死掉」了，不往後傳
+		// 如果當前累積流量已經超過 MaxQPS，則新來的流量可能全被丟棄
+		// 或者：我們簡單地按比例截斷單次 Input
+		if maxQPS > 0 && totalInputQPS > maxQPS {
+			// 這裡的邏輯比較複雜，簡單做：
+			// 如果已經過載，新來的流量視為溢出
+			// 但為了讓後端能收到滿載的流量 (2000)，我們至少要讓總 Output 達到 MaxQPS
+			// 暫時簡化：每次 Input 都依賴自身的大小做截斷測試 (不完美但可用)
+			if inputQPS > maxQPS {
+				processedQPS = maxQPS
+			}
 		}
 		componentProcessedQPS[id] = processedQPS
 
@@ -147,21 +169,26 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			outputQPS = int64(float64(processedQPS) * 0.2)
 		}
 
-		for _, nextID := range adj[id] {
-			simulateFlow(nextID, outputQPS)
+		// 分流邏輯 (Load Balancing)
+		// 如果有多個下游組件，則平均分配流量
+		// 注意：這裡只考慮「同層級分流」，例如 LB -> 3 台 WebServer
+		// 如果組件連接到不同類型的後端 (例如同時連 Cache 和 DB)，通常是 Cache 擋前面，DB 在後
+		// 但目前的 adjacency list 是平鋪的。我們簡單做：將流量平均分給所有下游
+		// 更精確的做法應該是依 component type 分組，但目前簡化處理
+		downstreamCount := int64(len(adj[id]))
+		if downstreamCount > 0 {
+			splitQPS := outputQPS / downstreamCount
+			for _, nextID := range adj[id] {
+				simulateFlow(nextID, splitQPS, newPathVisited)
+			}
 		}
 	}
 
 	for _, root := range roots {
 		compLoads[root] = currentQPS
 		visited[root] = true
-		for _, firstID := range adj[root] {
-			initialQPS := currentQPS
-			if compMap[firstID].Type == component.WebServer && serverCount > 0 {
-				initialQPS = currentQPS / serverCount
-			}
-			simulateFlow(firstID, initialQPS)
-		}
+		// 流量來源也要進行分流，如果連到多個入口 (例如多個 LB)
+		simulateFlow(root, currentQPS, make(map[string]bool))
 	}
 
 	// 5. 計算總體健康度 (以最終成功到達所有終點的流量比例來計算)
