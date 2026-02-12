@@ -175,9 +175,12 @@ const edgeTypes = {
 };
 
 function App() {
-  const [isWasmLoaded, setIsWasmLoaded] = useState(false);
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  // 支援多選刪除
+  const onNodesDelete = useCallback((nodesToDelete) => {
+    const nodeIds = new Set(nodesToDelete.map((n) => n.id));
+    setNodes((nds) => nds.filter((node) => !nodeIds.has(node.id)));
+    setEdges((eds) => eds.filter((edge) => !nodeIds.has(edge.source) && !nodeIds.has(edge.target)));
+  }, [setNodes, setEdges]);
   const [evaluationResult, setEvaluationResult] = useState(null);
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
@@ -405,9 +408,14 @@ function App() {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodesDelete={onNodesDelete}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             fitView
+            selectionOnDrag={true} // 啟用圈選功能
+            selectionKeyCode="Shift" // 按住 Shift 進行圈選（或者直接拖曳，視設定而定）
+            panOnDrag={[1, 2]} // 設定滑鼠中鍵和右鍵可以平移畫布，左鍵留給圈選 (如果是 false 則左鍵平移)
+            selectionMode="partial"
           >
             <Background color="#333" gap={20} />
             <Controls />
