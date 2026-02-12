@@ -28,7 +28,7 @@ func main() {
 	// 註冊處理程序 (Handlers)
 	r.POST("/evaluate/:design_id", func(c *gin.Context) {
 		id := c.Param("design_id")
-		res, err := evalEngine.Evaluate(id)
+		res, err := evalEngine.Evaluate(id, 0)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return

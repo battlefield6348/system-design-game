@@ -27,5 +27,5 @@ type Result struct {
 
 // Engine 定義評估引擎的介面
 type Engine interface {
-	Evaluate(designID string) (*Result, error)
+	Evaluate(designID string, elapsedSeconds int64) (*Result, error)
 }

@@ -1,42 +1,286 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+:root {
+  --bg-color: #0f172a;
+  --panel-bg: rgba(30, 41, 59, 0.7);
+  --accent-color: #6366f1;
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+}
+
+body {
+  margin: 0;
+  font-family: 'Outfit', 'Inter', sans-serif;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  overflow: hidden;
+}
+
+.game-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+.game-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background: var(--panel-bg);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 10;
 }
 
 .logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
-@keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+.logo h1 {
+  font-size: 1.25rem;
+  margin: 0;
+  background: linear-gradient(to right, #818cf8, #c084fc);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
 }
 
-.card {
-  padding: 2em;
+.badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
-.read-the-docs {
-  color: #888;
+.badge.success {
+  background: rgba(34, 197, 94, 0.2);
+  color: #4ade80;
+}
+
+.badge.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+
+.live-metrics {
+  display: flex;
+  gap: 1rem;
+}
+
+.metric {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent-color);
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #4f46e5;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.game-main {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.tool-panel {
+  width: 260px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  z-index: 5;
+}
+
+.tool-panel h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-secondary);
+}
+
+.tool-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.tool-list button {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 0.75rem;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: left;
+}
+
+.tool-list button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-color);
+}
+
+.canvas-area {
+  flex: 1;
+  background-color: #020617;
+}
+
+/* Custom Node Styles */
+.custom-node {
+  background: #1e293b;
+  border: 2px solid #334155;
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 154px;
+  color: white;
+  transition: all 0.2s;
+}
+
+.custom-node.selected {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.3);
+}
+
+.custom-node.traffic_source {
+  border-color: #f43f5e;
+}
+
+.custom-node.web_server {
+  border-color: #0ea5e9;
+}
+
+.custom-node.load_balancer {
+  border-color: #8b5cf6;
+}
+
+.node-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.node-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.node-name {
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.node-type {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+/* Evaluation Details */
+.eval-details {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 1.5rem;
+}
+
+.score-item {
+  margin-bottom: 1rem;
+}
+
+.score-item .dim {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.score-item .val {
+  float: right;
+  font-weight: 700;
+  color: var(--accent-color);
+}
+
+.score-item .comment {
+  margin: 0.25rem 0 0 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: var(--accent-color);
+}
+
+.react-flow__edge-path {
+  stroke: rgba(255, 255, 255, 0.3);
+  stroke-width: 3;
+}
+
+/* 修正控制項與地圖顯示 */
+.react-flow__controls {
+  background: var(--panel-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.react-flow__controls-button {
+  background: transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  fill: var(--text-primary);
+}
+
+.react-flow__controls-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.react-flow__minimap {
+  background-color: #020617;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.7);
+}
+
+.react-flow__minimap-node {
+  fill: var(--accent-color);
+  stroke: none;
 }
