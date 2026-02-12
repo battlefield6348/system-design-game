@@ -32,22 +32,39 @@ func (e *SimpleEngine) Evaluate(designID string) (*evaluation.Result, error) {
 		return nil, err
 	}
 
-	// TODO: 實作真正的模擬評估算法
-	// 這裡先放一個模擬的邏輯
-	scores := []evaluation.Score{
-		{Dimension: "Availability", Value: 85, Comment: "良好的冗餘設計"},
-		{Dimension: "Cost", Value: 70, Comment: "資源利用率尚可優化"},
+	// 基礎指標計算
+	var totalCost float64
+	for _, comp := range d.Components {
+		totalCost += comp.OperationalCost
 	}
 
-	total := 77.5
-	passed := total >= 60 // 簡易判定
+	// 模擬流量指標 (未來將根據拓撲計算)
+	currentQPS := int64(0)
+	if len(s.Phases) > 0 {
+		currentQPS = s.Phases[0].StartQPS
+	}
+
+	revenue := float64(currentQPS) * 0.01 // 簡單獲利模型
+
+	scores := []evaluation.Score{
+		{Dimension: "Availability", Value: 85, Comment: "系統運作中"},
+		{Dimension: "Profitability", Value: (revenue / (totalCost + 0.1)) * 10, Comment: "收益與成本評估"},
+	}
+
+	total := 80.0
+	passed := total >= 60
 
 	return &evaluation.Result{
-		DesignID:   designID,
-		ScenarioID: s.ID,
-		TotalScore: total,
-		Scores:     scores,
-		Passed:     passed,
-		CreatedAt:  time.Now().Unix(),
+		DesignID:      designID,
+		ScenarioID:    s.ID,
+		TotalScore:    total,
+		Scores:        scores,
+		Passed:        passed,
+		AvgLatencyMS:  120.5,
+		ErrorRate:     0.01,
+		TotalQPS:      currentQPS,
+		CostPerSec:    totalCost,
+		RevenuePerSec: revenue,
+		CreatedAt:     time.Now().Unix(),
 	}, nil
 }
