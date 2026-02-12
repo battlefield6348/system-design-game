@@ -49,6 +49,37 @@ body {
   -webkit-text-fill-color: transparent;
 }
 
+
+.metric-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #2a2a2a;
+  padding: 4px 12px;
+  border-radius: 4px;
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  color: #a0aec0;
+}
+
+.metric-input {
+  background: #1a1a1a;
+  border: 1px solid #4a5568;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  width: 80px;
+  font-family: inherit;
+  font-size: 0.9rem;
+}
+
+.metric-unit {
+  font-size: 0.8rem;
+  color: #718096;
+}
+
 .status-bar {
   display: flex;
   align-items: center;

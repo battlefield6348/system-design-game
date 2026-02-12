@@ -52,6 +52,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	// 3. 獲取當前應有的 QPS
+	var baseQPS int64
+	for _, comp := range d.Components {
+		if comp.Type == component.TrafficSource {
+			if v, ok := comp.Properties["start_qps"].(float64); ok {
+				baseQPS = int64(v)
+			} else if v, ok := comp.Properties["start_qps"].(int64); ok {
+				baseQPS = v
+			}
+		}
+	}
+
 	var currentQPS int64
 	tempElapsed := elapsedSeconds
 	for _, phase := range s.Phases {
@@ -66,6 +77,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	if currentQPS <= 0 && len(s.Phases) > 0 {
 		currentQPS = s.Phases[len(s.Phases)-1].EndQPS
 	}
+	
+	// 加上使用者設定的初始流量
+	currentQPS += baseQPS
 
 	// 4. 核心物理流量模擬：計算負載與截斷
 	visited := make(map[string]bool)

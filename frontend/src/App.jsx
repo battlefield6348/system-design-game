@@ -248,7 +248,16 @@ function App() {
         id: 'traffic-1',
         type: 'custom',
         position: { x: 50, y: 150 },
-        data: { label: '使用者流量', type: 'TRAFFIC_SOURCE', icon: Activity, onDelete: deleteNode },
+        id: 'traffic-1',
+        type: 'custom',
+        position: { x: 50, y: 150 },
+        data: {
+          label: '使用者流量',
+          type: 'TRAFFIC_SOURCE',
+          icon: Activity,
+          onDelete: deleteNode,
+          properties: { start_qps: 0 }
+        },
         deletable: false,
       }
     ];
@@ -359,6 +368,32 @@ function App() {
           <span className={`badge ${isWasmLoaded ? 'success' : 'warning'}`}>
             {isWasmLoaded ? '引擎已連線' : '引擎啟動中...'}
           </span>
+
+          <div className="metric-control">
+            <span className="metric-label">初始流量:</span>
+            <input
+              type="number"
+              className="metric-input"
+              value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.start_qps || 0}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 0;
+                setNodes(nds => nds.map(n => {
+                  if (n.data.type === 'TRAFFIC_SOURCE') {
+                    return {
+                      ...n,
+                      data: {
+                        ...n.data,
+                        properties: { ...n.data.properties, start_qps: val }
+                      }
+                    };
+                  }
+                  return n;
+                }));
+              }}
+            />
+            <span className="metric-unit">QPS</span>
+          </div>
+
           {evaluationResult && (
             <div className="live-metrics">
               <span className="metric">健康度: {evaluationResult.total_score.toFixed(1)}%</span>
