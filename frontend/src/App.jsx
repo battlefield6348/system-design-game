@@ -98,8 +98,9 @@ const CustomNode = ({ data, selected, id }) => {
           <div className="node-name">{data.label}</div>
           <div className="node-type">{data.type}</div>
           {data.load !== undefined && (
-            <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''}`}>
-              {data.load.toFixed(0)} QPS
+            <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${(data.properties?.max_qps && data.load > data.properties.max_qps) ? 'overloaded' : ''}`}>
+              {data.load.toFixed(0)}
+              {data.properties?.max_qps ? ` / ${data.properties.max_qps}` : ''} QPS
             </div>
           )}
         </div>

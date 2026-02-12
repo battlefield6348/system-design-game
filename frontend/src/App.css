@@ -395,3 +395,8 @@ body {
   color: #f43f5e;
   font-weight: bold;
 }
+
+.node-stats.overloaded {
+  color: #ff4d4d;
+  font-weight: bold;
+}
