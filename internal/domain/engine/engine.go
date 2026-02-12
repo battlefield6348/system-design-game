@@ -139,9 +139,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	health := (1.0 - errorRate) * 100.0
 
+	bottleneck := "伺服器"
+	if len(reachableDatabases) > 0 && dbCapacity < serverCapacity {
+		bottleneck = "資料庫"
+	}
+
 	scores := []evaluation.Score{
 		{Dimension: "Topology", Value: float64(len(reachableWebServers)) * 10, Comment: fmt.Sprintf("有效連接伺服器: %d 台", len(reachableWebServers))},
-		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("有效總容量: %d QPS, 當前流量: %d QPS", totalCapacity, currentQPS)},
+		{Dimension: "Capacity", Value: health, Comment: fmt.Sprintf("當前系統瓶頸: %s (上限 %d QPS, 需求 %d QPS)", bottleneck, totalCapacity, currentQPS)},
 	}
 
 	// 收集所有流量可達的活躍組件 ID (包含路徑上的所有組件)

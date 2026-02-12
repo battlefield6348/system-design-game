@@ -84,8 +84,10 @@ const CustomNode = ({ data, selected, id }) => {
   const isTargetLimited = isServer && connectionsIn.length >= 1;
   const isSourceLimited = isTraffic && connectionsOut.length >= 1;
 
+  const isOverloaded = data.properties?.max_qps && data.load > data.properties.max_qps;
+
   return (
-    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''}`}>
+    <div className={`custom-node ${data.type.toLowerCase()} ${selected ? 'selected' : ''} ${data.active ? 'active' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
       {!isTraffic && (
         <div className="delete-btn" onClick={(e) => {
           e.stopPropagation();
