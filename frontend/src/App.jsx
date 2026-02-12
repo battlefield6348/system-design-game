@@ -116,10 +116,16 @@ const CustomNode = ({ data, selected, id }) => {
   const isSourceLimited = isTraffic && connectionsOut.length >= 1;
 
   // Determine Max QPS to display
-  // If active and we have effectiveMaxQPS from backend, use it. Otherwise use static property.
+  // For DB Cluster, we need to account for multi-node capacity even when simulation is not running
+  let baseMaxQPS = data.properties?.max_qps || 0;
+  let multiplier = 1;
+  if (data.type === 'DATABASE' && data.properties?.replication_mode === 'MASTER_SLAVE') {
+    multiplier = 1 + (data.properties.slave_count || 0);
+  }
+
   const displayMaxQPS = (data.active && data.effectiveMaxQPS)
     ? data.effectiveMaxQPS
-    : (data.properties?.max_qps || 0);
+    : (baseMaxQPS * multiplier);
 
   const isOverloaded = displayMaxQPS > 0 && data.load > displayMaxQPS;
   const isCrashed = data.crashed;
@@ -242,6 +248,9 @@ const CustomNode = ({ data, selected, id }) => {
                       <span className="db-label">Slave</span>
                     </div>
                   ))}
+                </div>
+                <div className="db-cluster-stats">
+                  容量: {displayMaxQPS} QPS ({baseMaxQPS} x {multiplier})
                 </div>
               </div>
             ) : (

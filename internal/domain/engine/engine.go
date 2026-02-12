@@ -415,8 +415,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	scores := []evaluation.Score{
-		{Dimension: "Data Success", Value: totalScore, Comment: comment},
+		{Dimension: "System Health", Value: totalScore, Comment: comment},
 		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-50)/10), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
+		{Dimension: "Reliability", Value: reliabilityScore, Comment: "基於冗餘設計與崩潰頻率的可靠性評分。"},
 	}
 
 	activeIDs := make([]string, 0, len(visited))
