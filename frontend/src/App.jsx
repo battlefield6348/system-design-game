@@ -161,31 +161,68 @@ const CustomNode = ({ data, selected, id }) => {
 
       <div className="node-content">
         {isASG ? (
-          <div className="asg-content">
-            <div className="asg-label-row">
-              <div className="node-name">{data.label}</div>
-              <div className="node-type">AUTO SCALING GROUP ({replicas} Nodes)</div>
+          <div className="asg-container-inner">
+            <div className="asg-header">
+              <div className="asg-title">{data.label}</div>
+              <div className="asg-badge">AUTO SCALING GROUP</div>
             </div>
-            <div className="asg-instances">
-              {instances.map((_, i) => {
-                // 第一台機器預設是 active，其餘看是否還在 booting
-                const isFirst = i === 0;
-                const isProvisioning = !isFirst && data.properties?.replica_start_times &&
-                  (data.active_time - data.properties.replica_start_times[i - 1] < (data.properties.warmup_seconds || 10));
-                return (
-                  <div key={i} className={`mini-instance ${data.active && !isProvisioning ? 'active' : ''} ${isProvisioning ? 'provisioning' : ''}`}>
-                    <Server size={20} />
-                  </div>
-                );
-              })}
-            </div>
-            {data.load !== undefined && (
-              <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
-                {isCrashed ? '0' : data.load.toFixed(0)}
-                {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
-                {data.replicas > 1 && <span className="replica-label"> ({data.replicas} Nodes)</span>}
+
+            <div className="asg-body">
+              {/* 繪製內部自動佈線 */}
+              <svg className="asg-wiring">
+                {instances.map((_, i) => {
+                  const isFirst = i === 0;
+                  const isProvisioning = !isFirst && data.properties?.replica_start_times &&
+                    (data.active_time - data.properties.replica_start_times[i - 1] < (data.properties.warmup_seconds || 10));
+                  const yPos = (100 / (replicas + 1)) * (i + 1);
+                  return (
+                    <g key={`wire-${i}`}>
+                      <path
+                        d={`M 0,50 C 20,50 30,${yPos} 50,${yPos}`}
+                        className={`wire-path ${data.active && !isProvisioning ? 'active' : ''} ${isProvisioning ? 'provisioning' : ''}`}
+                      />
+                      <path
+                        d={`M 255,${yPos} C 275,${yPos} 290,50 310,50`}
+                        className={`wire-path ${data.active && !isProvisioning ? 'active' : ''}`}
+                      />
+                    </g>
+                  );
+                })}
+              </svg>
+
+              <div className="asg-instance-grid">
+                {instances.map((_, i) => {
+                  const isFirst = i === 0;
+                  const isProvisioning = !isFirst && data.properties?.replica_start_times &&
+                    (data.active_time - data.properties.replica_start_times[i - 1] < (data.properties.warmup_seconds || 10));
+
+                  // 計算單台分流負載 (只分給已啟動的機器)
+                  const workingReplicas = replicas - (data.properties?.replica_start_times?.filter((startTime) => {
+                    return (data.active_time - startTime < (data.properties.warmup_seconds || 10));
+                  }).length || 0);
+
+                  const individualLoad = data.load / Math.max(1, workingReplicas);
+                  const currentFullfilledLoad = data.active && !isProvisioning ? Math.max(0, individualLoad) : 0;
+
+                  return (
+                    <div key={i} className={`server-card ${data.active && !isProvisioning ? 'active' : ''} ${isProvisioning ? 'provisioning' : ''}`}>
+                      <Server size={18} />
+                      <div className="server-info">
+                        <span className="server-id">Node {i + 1}</span>
+                        <div className="server-qps-pill">{currentFullfilledLoad.toFixed(0)} QPS</div>
+                      </div>
+                      {isProvisioning && <div className="booting-spinner"></div>}
+                    </div>
+                  );
+                })}
               </div>
-            )}
+            </div>
+
+            <div className="asg-footer">
+              <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
+                總負載: {data.load.toFixed(0)} / {displayMaxQPS} QPS
+              </div>
+            </div>
           </div>
         ) : (
           <>
@@ -233,7 +270,8 @@ const getLayoutedElements = (nodes, edges, direction = 'LR') => {
   dagreGraph.setGraph({ rankdir: direction });
 
   nodes.forEach((node) => {
-    dagreGraph.setNode(node.id, { width: 260, height: 120 });
+    const isASG = node.data.type === 'AUTO_SCALING_GROUP';
+    dagreGraph.setNode(node.id, { width: isASG ? 310 : 260, height: isASG ? 180 : 120 });
   });
 
   edges.forEach((edge) => {
@@ -251,8 +289,8 @@ const getLayoutedElements = (nodes, edges, direction = 'LR') => {
       // We are shifting the dagre node position (anchor=center center) to the top left
       // so it matches the React Flow node anchor point (top left).
       position: {
-        x: nodeWithPosition.x - 260 / 2,
-        y: nodeWithPosition.y - 120 / 2,
+        x: nodeWithPosition.x - (node.data.type === 'AUTO_SCALING_GROUP' ? 310 : 260) / 2,
+        y: nodeWithPosition.y - (node.data.type === 'AUTO_SCALING_GROUP' ? 180 : 120) / 2,
       },
     };
 
