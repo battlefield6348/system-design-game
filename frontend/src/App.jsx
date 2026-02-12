@@ -220,7 +220,10 @@ const CustomNode = ({ data, selected, id }) => {
 
             <div className="asg-footer">
               <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`}>
-                總負載: {(data.load || 0).toFixed(0)} / {displayMaxQPS} QPS
+                總容量: {displayMaxQPS} QPS ({(data.properties?.max_qps || 1000)} x {data.replicas || 1})
+              </div>
+              <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`} style={{ borderTop: 'none', paddingTop: 0, marginTop: 2 }}>
+                總負載: {(data.load || 0).toFixed(0)} QPS
               </div>
             </div>
           </div>
@@ -662,7 +665,9 @@ function Game() {
                     </div>
                     {selectedNode.data.properties?.max_qps !== undefined && (
                       <div className="prop-group">
-                        <label>處理能力 (Max QPS)</label>
+                        <label>
+                          {isASG || selectedNode.data.type === 'WEB_SERVER' ? '單機處理能力 (Max QPS per Node)' : '處理能力 (Max QPS)'}
+                        </label>
                         <input
                           type="number"
                           value={selectedNode.data.properties.max_qps}
@@ -947,7 +952,7 @@ function Game() {
                   <Plus size={14} /> 伺服器 (1k QPS)
                 </button>
                 <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10 })}>
-                  <Plus size={14} /> 彈性伸縮組 (ASG)
+                  <Plus size={14} /> ASG (1k QPS/Node)
                 </button>
                 <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
                   <Plus size={14} /> 負載平衡器
