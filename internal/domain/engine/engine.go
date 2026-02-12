@@ -85,7 +85,6 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	visited := make(map[string]bool)
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
-	componentProcessedQPS := make(map[string]int64) // 紀錄組件「成功處理並往下傳」的流量
 
 	serverCount := int64(0)
 	for _, c := range d.Components {
@@ -94,14 +93,62 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	var simulateFlow func(string, int64, map[string]bool)
-	simulateFlow = func(id string, inputQPS int64, pathVisited map[string]bool) {
+	// Pass 1: 計算潛在總負載 (Potential Load)
+    // 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
+    // 目的：讓每個節點知道自己「將會」收到多少流量
+	passesInputLoad := make(map[string]int64)
+	
+	var calculateLoad func(string, int64, map[string]bool)
+	calculateLoad = func(id string, input int64, pathVisited map[string]bool) {
+		if _, exists := compMap[id]; !exists {
+            return
+        }
+        if pathVisited[id] {
+            return
+        }
+        newPathVisited := make(map[string]bool)
+        for k, v := range pathVisited {
+            newPathVisited[k] = v
+        }
+        newPathVisited[id] = true
+
+        passesInputLoad[id] += input
+
+        // 簡單分流預算傳遞
+        downstreamCount := int64(len(adj[id]))
+        if downstreamCount > 0 {
+            // Cache 邏輯在預算階段也要考慮嗎？
+            // 是的，因為 Cache 會減少往下游的「需求」。
+			comp := compMap[id]
+			output := input
+            if comp.Type == component.Cache {
+                output = int64(float64(input) * 0.2)
+            }
+            
+            split := output / downstreamCount
+            for _, nextID := range adj[id] {
+                calculateLoad(nextID, split, newPathVisited)
+            }
+        }
+	}
+
+    for _, root := range roots {
+        // 初始流量也需要分流 logic? 
+        // 假設 TrafficSource 本身不消耗，直接往下傳
+        // 為了對齊，我們把 TrafficSource 當作一個透明節點
+		calculateLoad(root, currentQPS, make(map[string]bool))
+    }
+
+
+	// Pass 2: 實際流量傳播 (Actual Flow Propagation)
+	// 根據 Pass 1 的 total load 決定崩潰與截斷
+	var propagateFlow func(string, int64, map[string]bool)
+	propagateFlow = func(id string, input int64, pathVisited map[string]bool) {
 		comp, exists := compMap[id]
 		if !exists {
 			return
 		}
 		
-		// 防止環路 (Cycle Detection)
 		if pathVisited[id] {
 			return
 		}
@@ -111,20 +158,20 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 		newPathVisited[id] = true
 
-		// 檢查持久性崩潰標記
+		// 檢查持久性崩潰
 		if crashed, ok := comp.Properties["crashed"].(bool); ok && crashed {
 			crashedNodes[id] = true
 			return
 		}
 
 		maxQPS := getCompMaxQPS(comp)
+		
+		// 這裡使用 Pass 1 計算出的 "潛在總流量" 來判斷是否崩潰
+        // 因為崩潰是看「嘗試打進來的量」，而不是「成功擠進來的量」
+		potentialTotalLoad := passesInputLoad[id]
+        compLoads[id] = potentialTotalLoad // 前端顯示的是「嘗試請求量」
 
-		// 累加流量到該節點
-		compLoads[id] += inputQPS
-		totalInputQPS := compLoads[id] // 使用當前累積的總流量來判斷崩潰
-
-		// 判斷是否新發生崩潰 (1.5 倍負載)
-		// 加入 Grace Period 機制
+		// 判斷崩潰
 		isGracePeriod := false
 		if restartedAt, ok := comp.Properties["restartedAt"].(float64); ok {
 			if float64(elapsedSeconds)-restartedAt < 5.0 {
@@ -136,59 +183,58 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 
-		if !isGracePeriod && maxQPS > 0 && totalInputQPS > int64(float64(maxQPS)*1.5) {
+		if !isGracePeriod && maxQPS > 0 && potentialTotalLoad > int64(float64(maxQPS)*1.5) {
 			crashedNodes[id] = true
-			// 崩潰後不再往下傳遞流量 (雖然已經累加了 Input，但 Output 為 0)
-			return
+			return // 崩潰，流量在此斷掉
 		}
 
 		visited[id] = true
 		
-		// 實作截斷邏輯：每個來源的流量被截斷後再往下傳？
-		// 這裡有個邏輯難點：如果要累加 Load，必須等所有上游都計算完？
-		// 簡單模型：我們不等待，直接將「這一次的 Input」進行截斷後傳遞。
-		// 雖然多次呼叫會導致下游被多次觸發，但只要下游也是累加模式就可以。
-		
-		processedQPS := inputQPS
-		// 如果當前累積流量已經超過 MaxQPS，則新來的流量可能全被丟棄
-		// 或者：我們簡單地按比例截斷單次 Input
-		if maxQPS > 0 && totalInputQPS > maxQPS {
-			// 這裡的邏輯比較複雜，簡單做：
-			// 如果已經過載，新來的流量視為溢出
-			// 但為了讓後端能收到滿載的流量 (2000)，我們至少要讓總 Output 達到 MaxQPS
-			// 暫時簡化：每次 Input 都依賴自身的大小做截斷測試 (不完美但可用)
-			if inputQPS > maxQPS {
-				processedQPS = maxQPS
-			}
-		}
-		componentProcessedQPS[id] = processedQPS
+        // 截斷邏輯 (Capping)
+        // 我們當前收到的是 input。
+        // 我們知道這個節點總共收到了 potentialTotalLoad。
+        // 如果 potentialTotalLoad > maxQPS，則每個來源的流量都應該被等比例縮減 (Throttling)
+        // 縮減比例 factor = maxQPS / potentialTotalLoad
+        // 實際處理流量 = input * factor
+        
+        actualProcessed := input
+        if maxQPS > 0 && potentialTotalLoad > maxQPS {
+            factor := float64(maxQPS) / float64(potentialTotalLoad)
+            actualProcessed = int64(float64(input) * factor)
+        }
+        
+		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
 
-		outputQPS := processedQPS
+		outputQPS := actualProcessed
 		if comp.Type == component.Cache {
-			// 快取效果：假設 80% 命中的請求在這一層就成功返回，不往後傳
-			outputQPS = int64(float64(processedQPS) * 0.2)
+			outputQPS = int64(float64(actualProcessed) * 0.2)
 		}
 
-		// 分流邏輯 (Load Balancing)
-		// 如果有多個下游組件，則平均分配流量
-		// 注意：這裡只考慮「同層級分流」，例如 LB -> 3 台 WebServer
-		// 如果組件連接到不同類型的後端 (例如同時連 Cache 和 DB)，通常是 Cache 擋前面，DB 在後
-		// 但目前的 adjacency list 是平鋪的。我們簡單做：將流量平均分給所有下游
-		// 更精確的做法應該是依 component type 分組，但目前簡化處理
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
 			splitQPS := outputQPS / downstreamCount
 			for _, nextID := range adj[id] {
-				simulateFlow(nextID, splitQPS, newPathVisited)
+				propagateFlow(nextID, splitQPS, newPathVisited)
 			}
 		}
 	}
 
 	for _, root := range roots {
-		compLoads[root] = currentQPS
-		visited[root] = true
-		// 流量來源也要進行分流，如果連到多個入口 (例如多個 LB)
-		simulateFlow(root, currentQPS, make(map[string]bool))
+		// Traffic Source 不受 MaxQPS 限制，也不會崩潰
+        // 直接傳遞完整流量
+        // 但我們還是要呼叫 propagateFlow 來觸發下游
+        // 這裡我們直接模擬分流傳給下游，避免 TrafficSource 本身被判定崩潰
+        // 或者簡單點：TrafficSource 的 maxQPS 是無限大
+        compLoads[root] = currentQPS
+        visited[root] = true
+        
+		downstreamCount := int64(len(adj[root]))
+        if downstreamCount > 0 {
+            split := currentQPS / downstreamCount
+            for _, nextID := range adj[root] {
+                propagateFlow(nextID, split, make(map[string]bool))
+            }
+        }
 	}
 
 	// 5. 計算總體健康度 (以最終成功到達所有終點的流量比例來計算)
