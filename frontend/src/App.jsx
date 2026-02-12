@@ -253,6 +253,10 @@ function App() {
           return { ...node, data: { ...node.data, load: nodeLoad, active: isActive } };
         }
 
+        if (node.data.type === 'LOAD_BALANCER') {
+          return { ...node, data: { ...node.data, load: isActive ? res.total_qps : 0, active: isActive } };
+        }
+
         return { ...node, data: { ...node.data, active: isActive, load: isActive ? undefined : 0 } };
       }));
     } catch (e) {
