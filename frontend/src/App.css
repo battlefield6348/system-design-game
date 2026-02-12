@@ -1052,3 +1052,45 @@ body {
     opacity: 0.4;
   }
 }
+
+/* Database Master-Slave Cluster Styles */
+.db-ms-cluster {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+}
+
+.db-master {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #6366f1;
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.4));
+}
+
+.db-slaves {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+  width: 100%;
+}
+
+.db-slave {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #94a3b8;
+  opacity: 0.8;
+}
+
+.db-label {
+  font-size: 0.6rem;
+  font-weight: 800;
+  margin-top: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

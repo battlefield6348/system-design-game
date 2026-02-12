@@ -369,7 +369,21 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 	}
 
-	totalScore := successRate * 100.0
+	// 綜合可靠性維度 (考慮冗餘設計)
+	reliabilityScore := 100.0 - (float64(len(crashedNodes)) * 10.0)
+	for _, comp := range compMap {
+		if comp.Type == component.Database {
+			if mode, ok := comp.Properties["replication_mode"].(string); ok && mode == "MASTER_SLAVE" {
+				if v, ok := comp.Properties["slave_count"].(float64); ok && v > 0 {
+					reliabilityScore += 10.0 // 有 MS 備援加分
+				}
+			}
+		}
+	}
+	if reliabilityScore > 100 { reliabilityScore = 100 }
+	if reliabilityScore < 0 { reliabilityScore = 0 }
+
+	totalScore := (successRate * 90.0) + (reliabilityScore * 0.1)
 
 	// 延遲模擬
 	congestionFactor := 1.0
@@ -436,17 +450,29 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 }
 
 func getCompMaxQPS(comp component.Component) int64 {
+	base := int64(0)
 	if v, ok := comp.Properties["max_qps"].(int64); ok {
-		return v
+		base = v
 	} else if v, ok := comp.Properties["max_qps"].(float64); ok {
-		return int64(v)
+		base = int64(v)
 	}
-	return 0
+
+	if comp.Type == component.Database {
+		if mode, ok := comp.Properties["replication_mode"].(string); ok && mode == "MASTER_SLAVE" {
+			slaves := 0
+			if v, ok := comp.Properties["slave_count"].(float64); ok {
+				slaves = int(v)
+			}
+			// 主從架構：Slaves 增加讀取 QPS 能力 (假設提升 100% per slave)
+			return base * int64(1+slaves)
+		}
+	}
+	return base
 }
 
 func getMaxPotentialCapacity(comp component.Component) int64 {
 	base := getCompMaxQPS(comp)
-	if comp.Type == component.WebServer {
+	if comp.Type == component.WebServer || comp.Type == component.AutoScalingGroup {
 		if auto, ok := comp.Properties["auto_scaling"].(bool); ok && auto {
 			maxReplicas := 5
 			if v, ok := comp.Properties["max_replicas"].(float64); ok {

@@ -226,9 +226,26 @@ const CustomNode = ({ data, selected, id }) => {
           </div>
         ) : (
           <>
-            <div className="node-icon-wrapper">
-              <Icon size={40} />
-            </div>
+            {data.type === 'DATABASE' && data.properties?.replication_mode === 'MASTER_SLAVE' ? (
+              <div className="db-ms-cluster">
+                <div className="db-master">
+                  <Database size={32} />
+                  <span className="db-label">Master</span>
+                </div>
+                <div className="db-slaves">
+                  {[...Array(data.properties.slave_count || 1)].map((_, i) => (
+                    <div key={i} className="db-slave">
+                      <Database size={16} />
+                      <span className="db-label">Slave</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="node-icon-wrapper">
+                <Icon size={40} />
+              </div>
+            )}
             <div className="node-info">
               <div className="node-name">{data.label}</div>
               <div className="node-type">{data.type}</div>
@@ -668,6 +685,66 @@ function Game() {
                       </div>
                     )}
 
+                    {/* Database Replication Settings */}
+                    {selectedNode.data.type === 'DATABASE' && (
+                      <>
+                        <div className="prop-group">
+                          <label>部署模式 (Deployment Mode)</label>
+                          <select
+                            className="metric-input"
+                            style={{ width: '100%', background: 'rgba(255,255,255,0.05)', padding: '8px' }}
+                            value={selectedNode.data.properties.replication_mode || 'SINGLE'}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setNodes(nds => nds.map(n => {
+                                if (n.id === selectedNode.id) {
+                                  return {
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      properties: {
+                                        ...n.data.properties,
+                                        replication_mode: val,
+                                        slave_count: val === 'MASTER_SLAVE' ? 1 : 0
+                                      }
+                                    }
+                                  };
+                                }
+                                return n;
+                              }));
+                            }}
+                          >
+                            <option value="SINGLE">單機 (Single)</option>
+                            <option value="MASTER_SLAVE">主從架構 (Master-Slave)</option>
+                          </select>
+                        </div>
+                        {selectedNode.data.properties.replication_mode === 'MASTER_SLAVE' && (
+                          <div className="prop-group">
+                            <label>從庫數量 (Slave Count: {selectedNode.data.properties.slave_count || 1})</label>
+                            <input
+                              type="range" min="1" max="3"
+                              value={selectedNode.data.properties.slave_count || 1}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value);
+                                setNodes(nds => nds.map(n => {
+                                  if (n.id === selectedNode.id) {
+                                    return {
+                                      ...n,
+                                      data: {
+                                        ...n.data,
+                                        properties: { ...n.data.properties, slave_count: val }
+                                      }
+                                    };
+                                  }
+                                  return n;
+                                }));
+                              }}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+
                     {/* Auto Scaling Logic for Web Server and ASG */}
                     {(selectedNode.data.type === 'WEB_SERVER' || selectedNode.data.type === 'AUTO_SCALING_GROUP') && (
                       <>
@@ -881,7 +958,7 @@ function Game() {
                 <button onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}>
                   <Plus size={14} /> WAF (防火牆)
                 </button>
-                <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500 })}>
+                <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0 })}>
                   <Plus size={14} /> 資料庫
                 </button>
                 <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 10000 })}>
