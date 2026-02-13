@@ -856,116 +856,6 @@ function Game() {
             {isWasmLoaded ? '引擎已連線' : '引擎啟動中...'}
           </span>
 
-          <div className="metric-control">
-            <span className="metric-label">初始流量:</span>
-            <input
-              type="number"
-              className="metric-input"
-              value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.start_qps || 0}
-              onChange={(e) => {
-                const val = parseInt(e.target.value) || 0;
-                setNodes(nds => nds.map(n => {
-                  if (n.data.type === 'TRAFFIC_SOURCE') {
-                    return {
-                      ...n,
-                      data: {
-                        ...n.data,
-                        properties: { ...n.data.properties, start_qps: val }
-                      }
-                    };
-                  }
-                  return n;
-                }));
-              }}
-            />
-            <span className="metric-unit">QPS</span>
-          </div>
-
-          <div className="metric-control checkbox">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.enable_attacks || false}
-                onChange={(e) => {
-                  setNodes(nds => nds.map(n => {
-                    if (n.data.type === 'TRAFFIC_SOURCE') {
-                      return { ...n, data: { ...n.data, properties: { ...n.data.properties, enable_attacks: e.target.checked } } };
-                    }
-                    return n;
-                  }));
-                }}
-              />
-              受攻擊模擬
-            </label>
-          </div>
-
-          <div className="metric-control checkbox">
-            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
-              <input
-                type="checkbox"
-                checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.burst_traffic || false}
-                onChange={(e) => {
-                  setNodes(nds => nds.map(n => {
-                    if (n.data.type === 'TRAFFIC_SOURCE') {
-                      return { ...n, data: { ...n.data, properties: { ...n.data.properties, burst_traffic: e.target.checked } } };
-                    }
-                    return n;
-                  }));
-                }}
-              />
-              突發流量
-            </label>
-          </div>
-
-          <div className="metric-control">
-            <span className="metric-label">讀取佔比:</span>
-            <input
-              type="number"
-              className="metric-input"
-              style={{ width: '45px' }}
-              min="0" max="100"
-              value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.read_ratio || 80}
-              onChange={(e) => {
-                const val = parseInt(e.target.value) || 0;
-                setNodes(nds => nds.map(n => {
-                  if (n.data.type === 'TRAFFIC_SOURCE') {
-                    return { ...n, data: { ...n.data, properties: { ...n.data.properties, read_ratio: val } } };
-                  }
-                  return n;
-                }));
-              }}
-            />
-            <span className="metric-unit">%</span>
-          </div>
-
-          <div className="metric-display">
-            <span className="metric-label">讀取:</span>
-            <span className="metric-val">{(evaluationResult?.total_read_qps || 0).toLocaleString()}</span>
-          </div>
-          <div className="metric-display">
-            <span className="metric-label">寫入:</span>
-            <span className="metric-val">{(evaluationResult?.total_write_qps || 0).toLocaleString()}</span>
-          </div>
-
-          {evaluationResult && (
-            <div className="live-metrics">
-              <span className="metric" title="成功獲取資料的請求比例">成功率: {(evaluationResult.total_score || 0).toFixed(1)}%</span>
-              <span className="metric">取得資料: {evaluationResult.fulfilled_qps} / {evaluationResult.total_qps} QPS</span>
-            </div>
-          )}
-
-          {evaluationResult?.is_attack_active && (
-            <div className="attack-badge">UNDER ATTACK!</div>
-          )}
-
-          {evaluationResult?.is_burst_active && (
-            <div className="burst-badge">BURSTING!</div>
-          )}
-
-          {evaluationResult?.is_random_drop && (
-            <div className="drop-badge">UNSTABLE!</div>
-          )}
-
           <button
             className="btn-primary"
             onClick={() => setShowScenarioModal(true)}
@@ -999,6 +889,122 @@ function Game() {
             >
               <RotateCcw size={16} /> 重置
             </button>
+          </div>
+        </div>
+
+        <div className="traffic-control-bar">
+          <div className="traffic-controls-group">
+            <div className="metric-control">
+              <span className="metric-label">初始流量:</span>
+              <input
+                type="number"
+                className="metric-input"
+                value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.start_qps || 0}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setNodes(nds => nds.map(n => {
+                    if (n.data.type === 'TRAFFIC_SOURCE') {
+                      return {
+                        ...n,
+                        data: {
+                          ...n.data,
+                          properties: { ...n.data.properties, start_qps: val }
+                        }
+                      };
+                    }
+                    return n;
+                  }));
+                }}
+              />
+              <span className="metric-unit">QPS</span>
+            </div>
+
+            <div className="metric-control">
+              <span className="metric-label">讀取佔比:</span>
+              <input
+                type="number"
+                className="metric-input"
+                style={{ width: '50px' }}
+                min="0" max="100"
+                value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.read_ratio || 80}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value) || 0;
+                  setNodes(nds => nds.map(n => {
+                    if (n.data.type === 'TRAFFIC_SOURCE') {
+                      return { ...n, data: { ...n.data, properties: { ...n.data.properties, read_ratio: val } } };
+                    }
+                    return n;
+                  }));
+                }}
+              />
+              <span className="metric-unit">%</span>
+            </div>
+
+            <div className="metric-control checkbox">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.burst_traffic || false}
+                  onChange={(e) => {
+                    setNodes(nds => nds.map(n => {
+                      if (n.data.type === 'TRAFFIC_SOURCE') {
+                        return { ...n, data: { ...n.data, properties: { ...n.data.properties, burst_traffic: e.target.checked } } };
+                      }
+                      return n;
+                    }));
+                  }}
+                />
+                突發流量
+              </label>
+            </div>
+
+            <div className="metric-control checkbox">
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.enable_attacks || false}
+                  onChange={(e) => {
+                    setNodes(nds => nds.map(n => {
+                      if (n.data.type === 'TRAFFIC_SOURCE') {
+                        return { ...n, data: { ...n.data, properties: { ...n.data.properties, enable_attacks: e.target.checked } } };
+                      }
+                      return n;
+                    }));
+                  }}
+                />
+                受攻擊模擬
+              </label>
+            </div>
+          </div>
+
+          <div className="traffic-metrics-group">
+            <div className="metric-display">
+              <span className="metric-label">讀取:</span>
+              <span className="metric-val">{(evaluationResult?.total_read_qps || 0).toLocaleString()}</span>
+            </div>
+            <div className="metric-display">
+              <span className="metric-label">寫入:</span>
+              <span className="metric-val">{(evaluationResult?.total_write_qps || 0).toLocaleString()}</span>
+            </div>
+
+            {evaluationResult && (
+              <div className="live-metrics">
+                <span className="metric" title="成功獲取資料的請求比例">成功率: {(evaluationResult.total_score || 0).toFixed(1)}%</span>
+                <span className="metric">取得資料: {evaluationResult.fulfilled_qps} / {evaluationResult.total_qps} QPS</span>
+              </div>
+            )}
+
+            {evaluationResult?.is_attack_active && (
+              <div className="attack-badge">UNDER ATTACK!</div>
+            )}
+
+            {evaluationResult?.is_burst_active && (
+              <div className="burst-badge">BURSTING!</div>
+            )}
+
+            {evaluationResult?.is_random_drop && (
+              <div className="drop-badge">UNSTABLE!</div>
+            )}
           </div>
         </div>
       </header>
