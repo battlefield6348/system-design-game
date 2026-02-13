@@ -1121,25 +1121,17 @@ function Game() {
                         <label>
                           {isASG || selectedNode.data.type === 'WEB_SERVER' ? '單機處理能力 (Max QPS per Node)' : '處理能力 (Max QPS)'}
                         </label>
-                        <input
-                          type="number"
-                          value={selectedNode.data.properties.max_qps}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 0;
-                            setNodes(nds => nds.map(n => {
-                              if (n.id === selectedNode.id) {
-                                return {
-                                  ...n,
-                                  data: {
-                                    ...n.data,
-                                    properties: { ...n.data.properties, max_qps: val }
-                                  }
-                                };
-                              }
-                              return n;
-                            }));
-                          }}
-                        />
+                        <div style={{
+                          background: 'rgba(255, 255, 255, 0.05)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          padding: '0.75rem',
+                          borderRadius: '8px',
+                          fontSize: '0.95rem',
+                          color: '#94a3b8'
+                        }}>
+                          {selectedNode.data.properties.max_qps.toLocaleString()} QPS
+                        </div>
+                        <p className="help-text">此組件的固定處理能力，無法修改。若需更高容量，請選擇其他規格或使用 ASG。</p>
                       </div>
                     )}
 
