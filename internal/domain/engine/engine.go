@@ -139,7 +139,19 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		compReplicas[c.ID] = 1
 	}
 
+	// 讀寫分離比例 (預設 80% 讀)
+	readRatio := 0.8
+	for _, root := range roots {
+		if v, ok := compMap[root].Properties["read_ratio"].(float64); ok {
+			readRatio = v / 100.0
+		}
+	}
+	currentReadQPS := int64(float64(currentQPS) * readRatio)
+	currentWriteQPS := currentQPS - currentReadQPS
+
 	var totalFulfilledQPS int64
+	var totalReadFulfilled int64
+	var totalWriteFulfilled int64
 	var totalOperationalCost float64
 	var totalBaseLatency float64
 	var consistencyScore = 100.0
@@ -150,8 +162,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	// 目的：讓每個節點知道自己「將會」收到多少流量
 	passesInputLoad := make(map[string]int64)
 	
-	var calculateLoad func(string, int64, int64, map[string]bool)
-	calculateLoad = func(id string, input int64, malInput int64, pathVisited map[string]bool) {
+	var calculateLoad func(string, int64, int64, int64, map[string]bool)
+	calculateLoad = func(id string, read, write, mal int64, pathVisited map[string]bool) {
 		if _, exists := compMap[id]; !exists {
 			return
 		}
@@ -164,39 +176,41 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 		newPathVisited[id] = true
 
-		passesInputLoad[id] += (input + malInput) // 惡意流量同樣消耗資源
+		passesInputLoad[id] += (read + write + mal)
 
-		// 簡單分流預算傳遞
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
 			comp := compMap[id]
-			output := input
-			malOutput := malInput
+			outRead, outWrite := read, write
+			
+			// 快取/CDN 特性：讀取會被攔截 (Hit)，寫入會穿透 (Pass-through)
 			if comp.Type == component.Cache || comp.Type == component.CDN {
-				output = int64(float64(input) * 0.2)
-			}
-			// WAF 攔截邏輯
-			if comp.Type == component.WAF {
-				malOutput = int64(float64(malInput) * 0.1) // 攔截 90%
+				outRead = int64(float64(read) * 0.2) // 假設 80% Cache Hit
+				outWrite = write                      // 寫入 100% 穿透
 			}
 			
-			split := output / downstreamCount
+			malOutput := int64(float64(mal) * 1.0)
+			if comp.Type == component.WAF {
+				malOutput = int64(float64(mal) * 0.1)
+			}
+			
+			splitRead := outRead / downstreamCount
+			splitWrite := outWrite / downstreamCount
 			malSplit := malOutput / downstreamCount
 			for _, nextID := range adj[id] {
-				calculateLoad(nextID, split, malSplit, newPathVisited)
+				calculateLoad(nextID, splitRead, splitWrite, malSplit, newPathVisited)
 			}
 		}
 	}
 
 	for _, root := range roots {
-		calculateLoad(root, currentQPS, currentMaliciousQPS, make(map[string]bool))
+		calculateLoad(root, currentReadQPS, currentWriteQPS, currentMaliciousQPS, make(map[string]bool))
 	}
 
 
 	// Pass 2: 實際流量傳播 (Actual Flow Propagation)
-	// 根據 Pass 1 的 total load 決定崩潰與截斷
-	var propagateFlow func(string, int64, int64, map[string]bool)
-	propagateFlow = func(id string, input int64, malInput int64, pathVisited map[string]bool) {
+	var propagateFlow func(string, int64, int64, int64, map[string]bool)
+	propagateFlow = func(id string, read, write, mal int64, pathVisited map[string]bool) {
 		comp, exists := compMap[id]
 		if !exists {
 			return
@@ -386,27 +400,30 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		// ------------------
 
 		visited[id] = true
-		compMaliciousLoads[id] += malInput
+		compMaliciousLoads[id] += mal
 		
 		// 截斷邏輯 (Capping)
-		// 這裡我們當前收到的是 input。
-		// 我們知道這個節點總共收到了 potentialTotalLoad。
-		// 如果 potentialTotalLoad > maxQPS，則每個來源的流量都應該被等比例縮減 (Throttling)
-		// 縮減比例 factor = maxQPS / potentialTotalLoad
-		// 實際處理流量 = input * factor
-		
-		actualProcessed := input
-		actualMalProcessed := malInput
+		actualRead := read
+		actualWrite := write
+		actualMalProcessed := mal
 
-		// WAF 過濾與誤殺 (False Positives)
+		// WAF 過濾
 		if comp.Type == component.WAF {
-			actualMalProcessed = int64(float64(malInput) * 0.1) // 攔截 90% 惡意流量
-			actualProcessed = int64(float64(input) * 0.98)      // 誤殺 2% 正面流量
+			actualMalProcessed = int64(float64(mal) * 0.1)
+			actualRead = int64(float64(read) * 0.98)
+			actualWrite = int64(float64(write) * 0.98)
 		}
-		// 安全事件判定
+		
+		// 資源放大效應：寫入操作通常比讀取消耗多 3-5 倍 CPU
+		effectiveResourceLoad := float64(actualRead) + float64(actualWrite)*4.0
+		
+		// 重新計算 CPU (考慮寫入加權)
+		if currentMaxQPS > 0 {
+			compCPUUsage[id] = math.Min(150.0, 10.0+(effectiveResourceLoad/float64(currentMaxQPS))*90.0)
+		}
+
+		// 安全判定
 		if (comp.Type == component.Database || comp.Type == component.NoSQL) && actualMalProcessed > 0 {
-			// API Gateway 可以擋掉一部分未經授權的流量 (簡化模擬)
-			// 如果流量路徑中有經過 API Gateway，則降低安全威脅
 			isProtected := false
 			for vid := range visited {
 				if compMap[vid].Type == component.APIGateway {
@@ -414,13 +431,13 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					break
 				}
 			}
-			
 			threat := float64(actualMalProcessed)
-			if isProtected {
-				threat *= 0.5 // 有 Gateway 保護，威脅減半
-			}
+			if isProtected { threat *= 0.5 }
 			securityIncidents += threat
 		}
+
+		var queuingDelay float64
+		var actualProcessed int64
 
 		// Message Queue 特殊邏輯... (略)
 		if comp.Type == component.MessageQueue {
@@ -458,8 +475,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				prevBacklog = v
 			}
 
-			// 嘗試處理：當前輸入 + 歷史積壓
-			attemptLoad := input + prevBacklog
+			// 嘗試處理
+			attemptLoad := read + write + prevBacklog
 			if effectiveProcessingRate > 0 && attemptLoad > effectiveProcessingRate {
 				actualProcessed = effectiveProcessingRate
 				compBacklogs[id] = attemptLoad - effectiveProcessingRate
@@ -467,47 +484,69 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				actualProcessed = attemptLoad
 				compBacklogs[id] = 0
 			}
+			// MQ 比例縮減讀寫
+			ratio := 1.0
+			if attemptLoad > 0 { ratio = float64(actualProcessed) / float64(attemptLoad) }
+			actualRead = int64(float64(read) * ratio)
+			actualWrite = int64(float64(write) * ratio)
 
 			// MQ 延遲代價
-			queuingDelay := 0.0
 			if effectiveProcessingRate > 0 {
 				queuingDelay = (float64(compBacklogs[id]) / float64(effectiveProcessingRate)) * 1000.0
 			}
-			totalBaseLatency += queuingDelay
 			
 			// 更新顯示用的有效 MaxQPS
 			compEffectiveMaxQPS[id] = effectiveProcessingRate
 		} else {
 			if currentMaxQPS > 0 && potentialTotalLoad > currentMaxQPS {
 				factor := float64(currentMaxQPS) / float64(potentialTotalLoad)
-				actualProcessed = int64(float64(input) * factor)
+				actualRead = int64(float64(read) * factor)
+				actualWrite = int64(float64(write) * factor)
 			}
+			actualProcessed = actualRead + actualWrite
 		}
+		totalBaseLatency += queuingDelay
 		
 		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
 
-		outputQPS := actualProcessed
+		outRead, outWrite := actualRead, actualWrite
 		if comp.Type == component.Cache || comp.Type == component.CDN {
-			outputQPS = int64(float64(actualProcessed) * 0.2)
+			// Cache/CDN 僅處理讀取，寫入流量 100% 穿透
+			outRead = int64(float64(actualRead) * 0.2) // 假設 80% 命中
+			outWrite = actualWrite // 寫入流量直接穿透
 		}
 
-		// 計算「成功取得資料」的量 (Data Fulfillment)
-		fulfilled := int64(0)
+		// 計算「成功取得資料」
+		fulfilledRead, fulfilledWrite := int64(0), int64(0)
 		if comp.Type == component.Cache || comp.Type == component.CDN {
-			// 快取命中的部分算成功
-			fulfilled = actualProcessed - outputQPS
+			fulfilledRead = actualRead - outRead
 		} else if comp.Type == component.Database || comp.Type == component.NoSQL || comp.Type == component.ObjectStorage || comp.Type == component.SearchEngine {
-			// 直接抵達資料庫或儲存層算成功
-			fulfilled = actualProcessed
+			// Slave DB 限制：只能處理讀取
+			isSlave := false
+			if mode, ok := comp.Properties["replication_mode"].(string); ok && mode == "SLAVE" {
+				isSlave = true
+			}
+			
+			fulfilledRead = actualRead
+			if !isSlave {
+				fulfilledWrite = actualWrite
+			} else if actualWrite > 0 {
+				// 寫到 Slave 會延遲降分或觸發警告 (這裡簡單處理)
+				consistencyScore -= 1.0
+			}
 		}
-		totalFulfilledQPS += fulfilled
+		totalReadFulfilled += fulfilledRead
+		totalWriteFulfilled += fulfilledWrite
+		totalFulfilledQPS = totalReadFulfilled + totalWriteFulfilled
 
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
-			splitQPS := outputQPS / downstreamCount
+			splitRead := outRead / downstreamCount
+			splitWrite := outWrite / downstreamCount
 			malSplit := actualMalProcessed / downstreamCount
 			for _, nextID := range adj[id] {
-				finalSplit := splitQPS
+				finalReadSplit := splitRead
+				finalWriteSplit := splitWrite
 				finalMalSplit := malSplit
 
 				if comp.Type == component.MessageQueue {
@@ -515,14 +554,21 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 						downstreamComp, exists := compMap[nextID]
 						if exists {
 							dsMaxCap := getMaxPotentialCapacity(downstreamComp)
-							if dsMaxCap > 0 && finalSplit > dsMaxCap {
-								finalSplit = dsMaxCap
+							// MQ PULL 模式下，下游拉取量受限於自身容量
+							if dsMaxCap > 0 && (finalReadSplit+finalWriteSplit) > dsMaxCap {
+								// 按比例分配讀寫流量
+								totalSplit := finalReadSplit + finalWriteSplit
+								if totalSplit > 0 {
+									ratio := float64(dsMaxCap) / float64(totalSplit)
+									finalReadSplit = int64(float64(finalReadSplit) * ratio)
+									finalWriteSplit = int64(float64(finalWriteSplit) * ratio)
+								}
 							}
 						}
 					}
 				}
 
-				propagateFlow(nextID, finalSplit, finalMalSplit, newPathVisited)
+				propagateFlow(nextID, finalReadSplit, finalWriteSplit, finalMalSplit, newPathVisited)
 			}
 		}
 	}
@@ -533,10 +579,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		
 		downstreamCount := int64(len(adj[root]))
 		if downstreamCount > 0 {
-			split := currentQPS / downstreamCount
+			splitRead := currentReadQPS / downstreamCount
+			splitWrite := currentWriteQPS / downstreamCount
 			malSplit := currentMaliciousQPS / downstreamCount
 			for _, nextID := range adj[root] {
-				propagateFlow(nextID, split, malSplit, make(map[string]bool))
+				propagateFlow(nextID, splitRead, splitWrite, malSplit, make(map[string]bool))
 			}
 		}
 	}
@@ -652,7 +699,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		Scores:              scores,
 		Passed:              totalScore >= 95.0,
 		AvgLatencyMS:        avgLatency,
-		TotalQPS:            currentQPS,
+		TotalReadQPS:             currentReadQPS,
+		TotalWriteQPS:            currentWriteQPS,
 		CreatedAt:           elapsedSeconds,
 		ActiveComponentIDs:  activeIDs,
 		CrashedComponentIDs: crashedIDs,
@@ -663,6 +711,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentReplicas:       compReplicas,
 		RetentionRate:           retentionRate,
 		IsRandomDrop:            isRandomDrop,
+		TotalQPS:                 currentQPS,
 		FulfilledQPS:            totalFulfilledQPS,
 		CostPerSec:              totalOperationalCost,
 		ComponentBacklogs:       compBacklogs,

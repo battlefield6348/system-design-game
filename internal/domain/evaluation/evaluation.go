@@ -19,6 +19,8 @@ type Result struct {
 	AvgLatencyMS float64 `json:"avg_latency_ms"`
 	ErrorRate    float64 `json:"error_rate"`
 	TotalQPS     int64   `json:"total_qps"`
+	TotalReadQPS  int64   `json:"total_read_qps"`
+	TotalWriteQPS int64   `json:"total_write_qps"`
 	CostPerSec   float64 `json:"cost_per_sec"`
 	RevenuePerSec float64 `json:"revenue_per_sec"`
 

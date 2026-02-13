@@ -627,7 +627,7 @@ function Game() {
           type: 'TRAFFIC_SOURCE',
           icon: Users,
           onDelete: deleteNode,
-          properties: { start_qps: 0 }
+          properties: { start_qps: 0, read_ratio: 80 }
         },
         deletable: false,
       }
@@ -904,6 +904,36 @@ function Game() {
             <span className="metric-unit">QPS</span>
           </div>
 
+          <div className="metric-control">
+            <span className="metric-label">讀取佔比:</span>
+            <input
+              type="number"
+              className="metric-input"
+              style={{ width: '45px' }}
+              min="0" max="100"
+              value={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.read_ratio || 80}
+              onChange={(e) => {
+                const val = parseInt(e.target.value) || 0;
+                setNodes(nds => nds.map(n => {
+                  if (n.data.type === 'TRAFFIC_SOURCE') {
+                    return { ...n, data: { ...n.data, properties: { ...n.data.properties, read_ratio: val } } };
+                  }
+                  return n;
+                }));
+              }}
+            />
+            <span className="metric-unit">%</span>
+          </div>
+
+          <div className="metric-display">
+            <span className="metric-label">讀取:</span>
+            <span className="metric-val">{(evaluationResult?.total_read_qps || 0).toLocaleString()}</span>
+          </div>
+          <div className="metric-display">
+            <span className="metric-label">寫入:</span>
+            <span className="metric-val">{(evaluationResult?.total_write_qps || 0).toLocaleString()}</span>
+          </div>
+
           {evaluationResult && (
             <div className="live-metrics">
               <span className="metric" title="成功獲取資料的請求比例">成功率: {(evaluationResult.total_score || 0).toFixed(1)}%</span>
@@ -1007,6 +1037,31 @@ function Game() {
                                   data: {
                                     ...n.data,
                                     properties: { ...n.data.properties, max_qps: val }
+                                  }
+                                };
+                              }
+                              return n;
+                            }));
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {selectedNode.data.type === 'TRAFFIC_SOURCE' && (
+                      <div className="prop-group">
+                        <label>讀取佔比 (Read Ratio: {selectedNode.data.properties.read_ratio || 80}%)</label>
+                        <input
+                          type="range" min="0" max="100"
+                          value={selectedNode.data.properties.read_ratio || 80}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value);
+                            setNodes(nds => nds.map(n => {
+                              if (n.id === selectedNode.id) {
+                                return {
+                                  ...n,
+                                  data: {
+                                    ...n.data,
+                                    properties: { ...n.data.properties, read_ratio: val }
                                   }
                                 };
                               }
