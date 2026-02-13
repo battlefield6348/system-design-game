@@ -304,9 +304,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					maxReplicas = int(v)
 				}
 				
-				threshold := 0.7 // 預設 70% 負載就擴展
+				threshold := 70.0 // 預設 70% 資源使用率就擴展
 				if v, ok := comp.Properties["scale_up_threshold"].(float64); ok {
-					threshold = v / 100.0
+					threshold = v
 				}
 
 				warmup := int64(10) // 預設 10 秒暖機
@@ -314,15 +314,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					warmup = int64(v)
 				}
 
-				// 計算目標副本數 (Target Replicas)
-				// 當前的潛在負載 / (單機能力 * 門檻)
-				needed := float64(potentialTotalLoad) / (float64(baseMaxQPS) * threshold)
-				targetReplicas := int(math.Ceil(needed))
-				if targetReplicas > maxReplicas {
-					targetReplicas = maxReplicas
-				}
-				if targetReplicas < 1 {
-					targetReplicas = 1
+				// 擴展指標：預設使用 CPU，也可以設定為 RAM
+				scaleMetric := "cpu"
+				if v, ok := comp.Properties["scale_metric"].(string); ok {
+					scaleMetric = v
 				}
 
 				// 考慮暖機時間 (由前端傳來的啟動時間清單)
@@ -339,8 +334,42 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					}
 				}
 				
-				// 確保至少有一台基礎機器 (如果是 ASG 通常至少 1 台)
+				// 確保至少有一台基礎機器
 				if activeCount < 1 { activeCount = 1 }
+
+				// 計算當前單機的資源使用率
+				effectiveResourceLoad := float64(read) + float64(write)*4.0 // 寫入加權
+				currentCPUUsage := 0.0
+				currentRAMUsage := 0.0
+				
+				if baseMaxQPS > 0 {
+					// CPU 使用率計算
+					currentCPUUsage = math.Min(100.0, 10.0+(effectiveResourceLoad/float64(baseMaxQPS)/float64(activeCount))*90.0)
+					
+					// RAM 使用率計算（簡化版）
+					currentRAMUsage = math.Min(100.0, 20.0+(float64(potentialTotalLoad)/float64(baseMaxQPS)/float64(activeCount))*60.0)
+				}
+
+				// 根據選擇的指標決定是否擴展
+				currentMetricValue := currentCPUUsage
+				if scaleMetric == "ram" {
+					currentMetricValue = currentRAMUsage
+				}
+
+				// 計算目標副本數
+				targetReplicas := activeCount
+				if currentMetricValue > threshold && activeCount < maxReplicas {
+					// 需要擴展：根據使用率計算需要多少台機器
+					// 例如：如果當前 CPU 90%，閾值 70%，則需要 90/70 = 1.28 倍的機器
+					needed := math.Ceil(float64(activeCount) * currentMetricValue / threshold)
+					targetReplicas = int(needed)
+					if targetReplicas > maxReplicas {
+						targetReplicas = maxReplicas
+					}
+				} else if currentMetricValue < threshold*0.5 && activeCount > 1 {
+					// 縮容：如果使用率低於閾值的 50%，可以縮減
+					targetReplicas = activeCount - 1
+				}
 
 				currentMaxQPS = baseMaxQPS * int64(activeCount)
 				compReplicas[id] = activeCount + bootingCount
