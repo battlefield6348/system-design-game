@@ -118,6 +118,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
 	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
+	compBacklogs := make(map[string]int64)          // 紀錄 MQ 等組件的積壓量
 
 	compReplicas := make(map[string]int)
 	for _, c := range d.Components {
@@ -327,9 +328,42 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		// 實際處理流量 = input * factor
 		
 		actualProcessed := input
-		if currentMaxQPS > 0 && potentialTotalLoad > currentMaxQPS {
-			factor := float64(currentMaxQPS) / float64(potentialTotalLoad)
-			actualProcessed = int64(float64(input) * factor)
+		
+		// Message Queue 特殊邏輯：消峰填谷 (Buffering)
+		if comp.Type == component.MessageQueue {
+			maxCap := currentMaxQPS
+			
+			// 從 Properties 獲取上一次的積壓量
+			prevBacklog := int64(0)
+			if v, ok := comp.Properties["backlog"].(float64); ok {
+				prevBacklog = int64(v)
+			} else if v, ok := comp.Properties["backlog"].(int64); ok {
+				prevBacklog = v
+			}
+
+			// 嘗試處理：當前輸入 + 歷史積壓
+			attemptLoad := input + prevBacklog
+			if maxCap > 0 && attemptLoad > maxCap {
+				// 超過處理能力，處理滿載，剩下的存入 backlog
+				actualProcessed = maxCap
+				compBacklogs[id] = attemptLoad - maxCap
+			} else {
+				// 能力足夠，全部處理，清空 backlog
+				actualProcessed = attemptLoad
+				compBacklogs[id] = 0
+			}
+
+			// MQ 延遲代價：積壓越多延遲越高
+			queuingDelay := 0.0
+			if maxCap > 0 {
+				queuingDelay = (float64(compBacklogs[id]) / float64(maxCap)) * 1000.0
+			}
+			totalBaseLatency += queuingDelay
+		} else {
+			if currentMaxQPS > 0 && potentialTotalLoad > currentMaxQPS {
+				factor := float64(currentMaxQPS) / float64(potentialTotalLoad)
+				actualProcessed = int64(float64(input) * factor)
+			}
 		}
 		
 		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
@@ -490,6 +524,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		IsRandomDrop:            isRandomDrop,
 		FulfilledQPS:            totalFulfilledQPS,
 		CostPerSec:              totalOperationalCost,
+		ComponentBacklogs:       compBacklogs,
 	}, nil
 }
 

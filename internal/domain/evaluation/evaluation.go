@@ -32,6 +32,7 @@ type Result struct {
 	RetentionRate           float64          `json:"retention_rate"`             // 當前使用者留存率 (0.0 - 1.0)
 	IsRandomDrop            bool             `json:"is_random_drop"`             // 是否處於隨機驟降狀態
 	FulfilledQPS            int64            `json:"fulfilled_qps"`              // 成功取得資料的 QPS
+	ComponentBacklogs       map[string]int64 `json:"component_backlogs"`         // 每個組件當前的訊息積壓量 (MQ 適用)
 }
 
 // Engine 定義評估引擎的介面

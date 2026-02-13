@@ -267,6 +267,11 @@ const CustomNode = ({ data, selected, id }) => {
                   {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
                 </div>
               )}
+              {data.type === 'MESSAGE_QUEUE' && (
+                <div className={`node-stats ${data.properties?.backlog > 0 ? 'limited' : ''}`} style={{ borderTop: 'none', paddingTop: 0 }}>
+                  積壓: {Math.max(0, data.properties?.backlog || 0).toFixed(0)} Msg
+                </div>
+              )}
             </div>
           </>
         )}
@@ -623,6 +628,11 @@ function Game() {
             startTimes = startTimes.slice(0, target - 1);
           }
           updatedProperties.replica_start_times = startTimes;
+        }
+
+        // MQ 積壓同步
+        if (node.data.type === 'MESSAGE_QUEUE') {
+          updatedProperties.backlog = res.component_backlogs?.[node.id] || 0;
         }
 
         return {
