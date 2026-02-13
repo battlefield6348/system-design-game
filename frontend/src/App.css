@@ -181,12 +181,21 @@ body {
   max-height: 100vh;
 }
 
-.tool-panel h3 {
+.tool-category {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.tool-category h3 {
   margin: 0;
-  font-size: 0.9rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  letter-spacing: 0.1em;
+  color: var(--accent-color);
+  border-left: 2px solid var(--accent-color);
+  padding-left: 8px;
 }
 
 .tool-list {
