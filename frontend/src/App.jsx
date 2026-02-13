@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ReactFlow,
   MiniMap,
@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock, Terminal, Award, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -371,6 +371,37 @@ function Game() {
 
   const [hoveredTool, setHoveredTool] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  // 系統日誌與成就
+  const [logs, setLogs] = useState([]);
+  const [achievements, setAchievements] = useState([]);
+  const unlockedSet = useRef(new Set());
+  const crashedSet = useRef(new Set());
+  const asgScaleRef = useRef({});
+  const terminalEndRef = useRef(null);
+
+  const addLog = useCallback((msg, type = 'info') => {
+    const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLogs(prev => [...prev.slice(-49), { time, msg, type }]);
+  }, []);
+
+  const unlockAchievement = useCallback((title, description) => {
+    if (unlockedSet.current.has(title)) return;
+    unlockedSet.current.add(title);
+    const id = Date.now();
+    setAchievements(prev => [...prev, { id, title, description }]);
+    addLog(`成就達成！【${title}】`, 'success');
+
+    // 5秒後自動移除通知
+    setTimeout(() => {
+      setAchievements(prev => prev.filter(a => a.id !== id));
+    }, 5000);
+  }, [addLog]);
+
+  // 自動捲動日誌
+  useEffect(() => {
+    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [logs]);
 
   const toggleCategory = (cat) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
@@ -739,6 +770,46 @@ function Game() {
           }
         };
       }));
+
+      // 事件偵測與紀錄
+      // 1. 偵測新崩潰
+      res.crashed_component_ids?.forEach(id => {
+        if (!crashedSet.current.has(id)) {
+          crashedSet.current.add(id);
+          const comp = nodes.find(n => n.id === id);
+          addLog(`[CRITICAL] 組件 ${comp?.data?.label || id} 已崩潰！QPS 超過負荷上限。`, 'error');
+        }
+      });
+      // 移除已重啟的崩潰紀錄
+      crashedSet.current.forEach(id => {
+        if (!res.crashed_component_ids?.includes(id)) {
+          crashedSet.current.delete(id);
+        }
+      });
+
+      // 2. 偵測 ASG 擴充
+      Object.entries(res.component_replicas || {}).forEach(([id, replicas]) => {
+        const prev = asgScaleRef.current[id] || 1;
+        if (replicas > prev) {
+          const comp = nodes.find(n => n.id === id);
+          addLog(`[ASG] ${comp?.data?.label || id} 正在擴展副本: ${prev} -> ${replicas}`, 'info');
+        } else if (replicas < prev) {
+          const comp = nodes.find(n => n.id === id);
+          addLog(`[ASG] ${comp?.data?.label || id} 正在縮減副本: ${prev} -> ${replicas}`, 'info');
+        }
+        asgScaleRef.current[id] = replicas;
+      });
+
+      // 3. 成就判定
+      if (res.total_score >= 100 && gameTime > 10) {
+        unlockAchievement("架構大師", "系統健康度與資料獲取率達到 100%");
+      }
+      if (res.fulfilled_qps >= 10000) {
+        unlockAchievement("萬人之敵", "成功處理超過 10k QPS 的流量");
+      }
+      if (res.avg_latency_ms < 5 && res.fulfilled_qps > 1000) {
+        unlockAchievement("閃電俠", "在高負載下依然保持極低的系統延遲 (< 5ms)");
+      }
     } catch (e) {
       console.error("解析評估結果失敗:", e);
     }
@@ -1417,9 +1488,42 @@ function Game() {
                 <span>重置流量</span>
               </button>
             </div>
+
+            {/* System Terminal Overlay */}
+            <div className="system-terminal">
+              <div className="terminal-header">
+                <Terminal size={14} />
+                <span>System Console</span>
+              </div>
+              <div className="terminal-body">
+                {logs.length === 0 && <div className="log-line info"><span className="log-msg">&gt; 系統就緒，等待流量輸入...</span></div>}
+                {logs.map((log, i) => (
+                  <div key={i} className={`log-line ${log.type}`}>
+                    <span className="log-time">[{log.time}]</span>
+                    <span className="log-msg">{log.msg}</span>
+                  </div>
+                ))}
+                <div ref={terminalEndRef} />
+              </div>
+            </div>
           </ReactFlow>
         </section>
       </main>
+
+      {/* Achievement Toasts */}
+      <div className="achievement-container">
+        {achievements.map(achieve => (
+          <div key={achieve.id} className="achievement-toast">
+            <div className="achieve-icon">
+              <Award size={24} />
+            </div>
+            <div className="achieve-info">
+              <h5>成就達成！</h5>
+              <p><strong>{achieve.title}:</strong> {achieve.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
 
       {/* Scenario Selection Modal */}
       {showScenarioModal && (
