@@ -6,16 +6,16 @@
 
 遊戲中提供多種系統設計組件，每種組件具有特定的行為與屬性：
 
-| 組件類型 | 代碼 | 核心行為 | 關鍵屬性 |
-| :--- | :--- | :--- | :--- |
-| **流量來源** | `TRAFFIC_SOURCE` | 系統流量進入點，不消耗資源，支援突發流量。 | `start_qps`, `burst_traffic` |
-| **負載平衡器** | `LOAD_BALANCER` | 將流量均分至下游組件，具有較高穩定性。 | `max_qps` |
-| **彈性伸縮組** | `AUTO_SCALING_GROUP` | 容器組件，可動態增減伺服器實例，需冷啟暖機。 | `max_replicas`, `scale_up_threshold`, `warmup_seconds` |
-| **網頁伺服器** | `WEB_SERVER` | 處理核心業務邏輯。 | `max_qps` |
-| **資料庫** | `DATABASE` | 資料持久層，支援主從架構 (Master-Slave)。 | `replication_mode`, `slave_count` |
-| **快取/CDN** | `CACHE`, `CDN` | 攔截 80% 流量 (模擬命中)，減少下游負載。 | `max_qps` |
-| **訊息隊列** | `MESSAGE_QUEUE` | 緩衝流量，支援 PULL 模式避免壓跨下游。 | `delivery_mode` (PUSH/PULL) |
-| **基礎設施** | `WAF`, `ObjectStorage`, `SearchEngine` | 各司其職，具有極高的崩潰閾值。 | `max_qps` |
+| 組件類型 | 代碼 | 優點 | 缺點 / Trade-off | 關鍵屬性 |
+| :--- | :--- | :--- | :--- | :--- |
+| **流量來源** | `TRAFFIC_SOURCE` | 模擬使用者請求進入點。 | 可能產生突發流量壓垮下游。 | `start_qps`, `burst_traffic` |
+| **負載平衡器** | `LOAD_BALANCER` | 分散流量、高穩定性。 | 引入額外的轉發延遲 (約 5ms)。 | `max_qps` |
+| **彈性伸縮組** | `AUTO_SCALING_GROUP` | 自動應對流量增長。 | 具有暖機延遲，且多節點維運成本高。 | `max_replicas`, `warmup_seconds` |
+| **網頁伺服器** | `WEB_SERVER` | 處理業務邏輯。 | 不同等級伺服器在成本與延遲間需取捨。 | `max_qps`, `base_latency` |
+| **資料庫** | `DATABASE` | 資料持久化、高一致性。 | 基礎延遲高且昂貴，擴展性較差。 | `replication_mode`, `slave_count` |
+| **快取/CDN** | `CACHE`, `CDN` | 極低延遲、減輕下游負載。 | 可能產生資料不一致 (Stale Data)。 | `max_qps` |
+| **訊息隊列** | `MESSAGE_QUEUE` | 緩衝流量、解耦系統。 | 帶來顯著的異步延遲與最終一致性問題。 | `delivery_mode` (PUSH/PULL) |
+| **基礎設施** | `WAF`, `S3`, `ES` | 專業分工、極高穩定性。 | 增加架構複雜度與固定維運成本。 | `max_qps` |
 
 ---
 
