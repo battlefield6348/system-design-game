@@ -417,6 +417,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			prevBacklog := int64(0)
 			if v, ok := comp.Properties["backlog"].(float64); ok { prevBacklog = int64(v) }
 			ram += (float64(prevBacklog) / 50000.0) * 80.0 // 假設 5萬筆積壓會爆 RAM
+		case component.Worker:
+			// Worker: 記憶體消耗較高，與負載相關
+			if effectiveMaxForRAM > 0 {
+				ram += 20.0 + (effectiveLoadForRAM / effectiveMaxForRAM) * 40.0
+			}
 		case component.Database, component.NoSQL:
 			ram += 30.0 + (effectiveLoadForRAM / 10000.0) * 20.0
 		default:

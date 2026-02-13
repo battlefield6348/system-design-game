@@ -430,7 +430,8 @@ function Game() {
     'OBJECT_STORAGE': '雲端儲存 (S3)。專門存放影音、Log 等大型文件，具備極高的可用性。',
     'SEARCH_ENGINE': '搜尋引擎 (ES)。解決資料庫在全文檢索下的效能瓶頸，熱搜必備。',
     'CACHE': '極速快取 (Redis)。將熱點數據放進內容中，讓 API 延遲縮短至 1ms 以內。',
-    'MESSAGE_QUEUE': '異步訊息隊列 (Kafka)。讓系統組件解耦，具備削峰填谷能力。'
+    'MESSAGE_QUEUE': '異步訊息隊列 (Kafka)。讓系統組件解耦，具備削峰填谷能力。',
+    'WORKER': '後端處理單元。專門從 Message Queue 獲取任務並執行，適合處理耗時的寫入操作或數據分析。'
   };
 
   // 初始化取得關卡列表
@@ -1324,6 +1325,17 @@ function Game() {
                     >
                       <Plus size={14} /> ASG 叢集
                     </button>
+                    <button
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'Worker 處理單元', type: 'WORKER' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('WORKER', 'Worker 處理單元', Cpu, { max_qps: 500, base_latency: 50, setup_cost: 100, operational_cost: 0.1 })}
+                    >
+                      <Plus size={14} /> Worker 處理單元
+                    </button>
                   </div>
                 )}
               </div>
@@ -1564,81 +1576,87 @@ function Game() {
 
 
       {/* Scenario Selection Modal */}
-      {showScenarioModal && (
-        <div className="modal-overlay">
-          <div className="scenario-modal">
-            <div className="modal-header">
-              <h2>選擇系統設計挑戰</h2>
-              <button onClick={() => setShowScenarioModal(false)}><X /></button>
-            </div>
-            <div className="scenario-list">
-              {scenarios.map(s => (
-                <div
-                  key={s.id}
-                  className={`scenario-card ${selectedScenario?.id === s.id ? 'active' : ''}`}
-                  onClick={() => {
-                    setSelectedScenario(s);
-                    setShowScenarioModal(false);
-                    resetSimulation();
-                  }}
-                >
-                  <div className="card-header">
-                    <h4>{s.title}</h4>
-                    {selectedScenario?.id === s.id && <Trophy size={16} color="var(--warning)" />}
+      {
+        showScenarioModal && (
+          <div className="modal-overlay">
+            <div className="scenario-modal">
+              <div className="modal-header">
+                <h2>選擇系統設計挑戰</h2>
+                <button onClick={() => setShowScenarioModal(false)}><X /></button>
+              </div>
+              <div className="scenario-list">
+                {scenarios.map(s => (
+                  <div
+                    key={s.id}
+                    className={`scenario-card ${selectedScenario?.id === s.id ? 'active' : ''}`}
+                    onClick={() => {
+                      setSelectedScenario(s);
+                      setShowScenarioModal(false);
+                      resetSimulation();
+                    }}
+                  >
+                    <div className="card-header">
+                      <h4>{s.title}</h4>
+                      {selectedScenario?.id === s.id && <Trophy size={16} color="var(--warning)" />}
+                    </div>
+                    <p>{s.description}</p>
+                    <div className="card-goals">
+                      <span>目標 QPS: {(s.goal.min_qps / 1000).toFixed(0)}k</span>
+                      <span>允許可忍受延遲: {s.goal.max_latency_ms}ms</span>
+                    </div>
                   </div>
-                  <p>{s.description}</p>
-                  <div className="card-goals">
-                    <span>目標 QPS: {(s.goal.min_qps / 1000).toFixed(0)}k</span>
-                    <span>允許可忍受延遲: {s.goal.max_latency_ms}ms</span>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Goal Overlay */}
-      {selectedScenario && (
-        <div className="goal-overlay">
-          <div className="goal-title">當前任務: {selectedScenario.title}</div>
-          <div className="goal-progress">
-            <div className="progress-item">
-              <span className="label">目標 QPS</span>
-              <span className={`status ${(evaluationResult?.fulfilled_qps || 0) >= selectedScenario.goal.min_qps ? 'success' : 'fail'}`}>
-                {(evaluationResult?.fulfilled_qps || 0)} / {selectedScenario.goal.min_qps}
-              </span>
-            </div>
-            <div className="progress-item">
-              <span className="label">延遲上限</span>
-              <span className={`status ${(evaluationResult?.avg_latency_ms || 0) <= selectedScenario.goal.max_latency_ms ? 'success' : 'fail'}`}>
-                {(evaluationResult?.avg_latency_ms || 0).toFixed(1)} / {selectedScenario.goal.max_latency_ms}ms
-              </span>
-            </div>
-            <div className="mission-timer">
-              <Clock size={16} />
-              <span>剩餘測試時間: {Math.max(0, selectedScenario.goal.duration - gameTime)}s</span>
+      {
+        selectedScenario && (
+          <div className="goal-overlay">
+            <div className="goal-title">當前任務: {selectedScenario.title}</div>
+            <div className="goal-progress">
+              <div className="progress-item">
+                <span className="label">目標 QPS</span>
+                <span className={`status ${(evaluationResult?.fulfilled_qps || 0) >= selectedScenario.goal.min_qps ? 'success' : 'fail'}`}>
+                  {(evaluationResult?.fulfilled_qps || 0)} / {selectedScenario.goal.min_qps}
+                </span>
+              </div>
+              <div className="progress-item">
+                <span className="label">延遲上限</span>
+                <span className={`status ${(evaluationResult?.avg_latency_ms || 0) <= selectedScenario.goal.max_latency_ms ? 'success' : 'fail'}`}>
+                  {(evaluationResult?.avg_latency_ms || 0).toFixed(1)} / {selectedScenario.goal.max_latency_ms}ms
+                </span>
+              </div>
+              <div className="mission-timer">
+                <Clock size={16} />
+                <span>剩餘測試時間: {Math.max(0, selectedScenario.goal.duration - gameTime)}s</span>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
-      {hoveredTool && (
-        <div
-          className="tool-intro-card"
-          style={{
-            position: 'fixed',
-            left: mousePos.x + 20,
-            top: mousePos.y - 40,
-            pointerEvents: 'none',
-            zIndex: 9999
-          }}
-        >
-          <h4>{hoveredTool.name}</h4>
-          <p>{toolDescriptions[hoveredTool.type]}</p>
-        </div>
-      )}
-    </div>
+      {
+        hoveredTool && (
+          <div
+            className="tool-intro-card"
+            style={{
+              position: 'fixed',
+              left: mousePos.x + 20,
+              top: mousePos.y - 40,
+              pointerEvents: 'none',
+              zIndex: 9999
+            }}
+          >
+            <h4>{hoveredTool.name}</h4>
+            <p>{toolDescriptions[hoveredTool.type]}</p>
+          </div>
+        )
+      }
+    </div >
   );
 }
 
