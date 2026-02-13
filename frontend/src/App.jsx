@@ -880,6 +880,24 @@ function Game() {
             <span className="metric-unit">QPS</span>
           </div>
 
+          <div className="metric-control checkbox">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.burst_traffic || false}
+                onChange={(e) => {
+                  setNodes(nds => nds.map(n => {
+                    if (n.data.type === 'TRAFFIC_SOURCE') {
+                      return { ...n, data: { ...n.data, properties: { ...n.data.properties, burst_traffic: e.target.checked } } };
+                    }
+                    return n;
+                  }));
+                }}
+              />
+              突發流量
+            </label>
+          </div>
+
           <div className="metric-control">
             <span className="metric-label">讀取佔比:</span>
             <input
@@ -1190,56 +1208,6 @@ function Game() {
                       </>
                     )}
 
-                    {/* Burst Traffic Logic for Traffic Source */}
-                    {selectedNode.data.type === 'TRAFFIC_SOURCE' && (
-                      <div className="props-form">
-                        <div className="prop-group">
-                          <label>初始 QPS (Start QPS)</label>
-                          <input
-                            type="number"
-                            value={selectedNode.data.properties.start_qps || 0}
-                            onChange={(e) => {
-                              const val = parseInt(e.target.value) || 0;
-                              setNodes(nds => nds.map(n => {
-                                if (n.id === selectedNode.id) {
-                                  return {
-                                    ...n,
-                                    data: {
-                                      ...n.data,
-                                      properties: { ...n.data.properties, start_qps: val }
-                                    }
-                                  };
-                                }
-                                return n;
-                              }));
-                            }}
-                          />
-                        </div>
-                        <div className="prop-group checkbox">
-                          <label>
-                            <input
-                              type="checkbox"
-                              checked={selectedNode.data.properties.burst_traffic || false}
-                              onChange={(e) => {
-                                setNodes(nds => nds.map(n => {
-                                  if (n.id === selectedNode.id) {
-                                    return {
-                                      ...n,
-                                      data: {
-                                        ...n.data,
-                                        properties: { ...n.data.properties, burst_traffic: e.target.checked }
-                                      }
-                                    };
-                                  }
-                                  return n;
-                                }));
-                              }}
-                            />
-                            啟用突發流量 (Simulate Spikes)
-                          </label>
-                        </div>
-                      </div>
-                    )}
 
                     {/* MQ Specific Settings */}
                     {selectedNode.data.type === 'MESSAGE_QUEUE' && (
