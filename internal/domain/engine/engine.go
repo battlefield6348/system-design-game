@@ -35,9 +35,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	// 1. 建立連線地圖 (Adjacency List)
-	adj := make(map[string][]string)
+	type edgeInfo struct {
+		ToID        string
+		TrafficType string
+	}
+	adj := make(map[string][]edgeInfo)
 	for _, conn := range d.Connections {
-		adj[conn.FromID] = append(adj[conn.FromID], conn.ToID)
+		tType := conn.TrafficType
+		if tType == "" {
+			tType = "all"
+		}
+		adj[conn.FromID] = append(adj[conn.FromID], edgeInfo{ToID: conn.ToID, TrafficType: tType})
 	}
 
 	// 2. 找出所有組件與流量起點
@@ -175,7 +183,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	
 	var calculateLoad func(string, int64, int64, int64, map[string]bool)
 	calculateLoad = func(id string, read, write, mal int64, pathVisited map[string]bool) {
-		if _, exists := compMap[id]; !exists {
+		comp, exists := compMap[id]
+		if !exists {
 			return
 		}
 		if pathVisited[id] {
@@ -189,9 +198,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		passesInputLoad[id] += (read + write + mal)
 
-		downstreamCount := int64(len(adj[id]))
-		if downstreamCount > 0 {
-			comp := compMap[id]
+		downstreamEdges := adj[id]
+		if len(downstreamEdges) > 0 {
 			outRead, outWrite := read, write
 			
 			// 快取/CDN 特性：讀取會被攔截 (Hit)，寫入會穿透 (Pass-through)
@@ -205,11 +213,30 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				malOutput = int64(float64(mal) * 0.1)
 			}
 			
-			splitRead := outRead / downstreamCount
-			splitWrite := outWrite / downstreamCount
-			malSplit := malOutput / downstreamCount
-			for _, nextID := range adj[id] {
-				calculateLoad(nextID, splitRead, splitWrite, malSplit, newPathVisited)
+			// 計算接受讀取和寫入的連線數量
+			readTargets := 0
+			writeTargets := 0
+			for _, edge := range downstreamEdges {
+				if edge.TrafficType == "all" || edge.TrafficType == "read" {
+					readTargets++
+				}
+				if edge.TrafficType == "all" || edge.TrafficType == "write" {
+					writeTargets++
+				}
+			}
+
+			for _, edge := range downstreamEdges {
+				var rSplit, wSplit, mSplit int64
+				if (edge.TrafficType == "all" || edge.TrafficType == "read") && readTargets > 0 {
+					rSplit = outRead / int64(readTargets)
+				}
+				if (edge.TrafficType == "all" || edge.TrafficType == "write") && writeTargets > 0 {
+					wSplit = outWrite / int64(writeTargets)
+				}
+				// 惡意流量均分給所有連線
+				mSplit = malOutput / int64(len(downstreamEdges))
+				
+				calculateLoad(edge.ToID, rSplit, wSplit, mSplit, newPathVisited)
 			}
 		}
 	}
@@ -532,10 +559,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			
 			// 2. 下游消費者的總處理能力 (Consumer-Driven)
 			downstreamCapacity := int64(0)
-			for _, nextID := range adj[id] {
-				if dsComp, ok := compMap[nextID]; ok {
+			for _, edge := range adj[id] {
+				if dsComp, ok := compMap[edge.ToID]; ok {
 					// 如果下游已經掛了，則不提供處理能力
-					if crashedNodes[nextID] {
+					if crashedNodes[edge.ToID] {
 						continue
 					}
 					// 這裡拿的是下游的基礎或有效容量
@@ -595,17 +622,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		
 		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
 
-		outRead, outWrite := actualRead, actualWrite
-		if comp.Type == component.Cache || comp.Type == component.CDN {
-			// Cache/CDN 僅處理讀取，寫入流量 100% 穿透
-			outRead = int64(float64(actualRead) * 0.2) // 假設 80% 命中
-			outWrite = actualWrite // 寫入流量直接穿透
-		}
-
 		// 計算「成功取得資料」
 		fulfilledRead, fulfilledWrite := int64(0), int64(0)
 		if comp.Type == component.Cache || comp.Type == component.CDN {
-			fulfilledRead = actualRead - outRead
+			fulfilledRead = int64(float64(actualRead) * 0.8) // 80% 命中
 		} else if comp.Type == component.Database || comp.Type == component.NoSQL || comp.Type == component.ObjectStorage || comp.Type == component.SearchEngine {
 			// Slave DB 限制：只能處理讀取
 			isSlave := false
@@ -627,51 +647,96 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		totalWriteFulfilled += fulfilledWrite
 		totalFulfilledQPS = totalReadFulfilled + totalWriteFulfilled
 
-		downstreamCount := int64(len(adj[id]))
-		if downstreamCount > 0 {
-			splitRead := outRead / downstreamCount
-			splitWrite := outWrite / downstreamCount
-			malSplit := actualMalProcessed / downstreamCount
-			for _, nextID := range adj[id] {
-				finalReadSplit := splitRead
-				finalWriteSplit := splitWrite
-				finalMalSplit := malSplit
+		downstreamEdges := adj[id]
+		if len(downstreamEdges) > 0 {
+			outRead, outWrite := actualRead, actualWrite
+			
+			// 快閃命中：扣除已被快取攔截的「讀取」流量
+			if comp.Type == component.Cache || comp.Type == component.CDN {
+				outRead = int64(float64(actualRead) * 0.2) 
+			}
+			
+			malOutput := int64(float64(actualMalProcessed) * 1.0)
+			if comp.Type == component.WAF {
+				malOutput = int64(float64(actualMalProcessed) * 0.1)
+			}
+			
+			// 計算接受讀取和寫入的連線數量
+			readTargets := 0
+			writeTargets := 0
+			for _, edge := range downstreamEdges {
+				if edge.TrafficType == "all" || edge.TrafficType == "read" {
+					readTargets++
+				}
+				if edge.TrafficType == "all" || edge.TrafficType == "write" {
+					writeTargets++
+				}
+			}
 
+			for _, edge := range downstreamEdges {
+				var rSplit, wSplit, mSplit int64
+				if (edge.TrafficType == "all" || edge.TrafficType == "read") && readTargets > 0 {
+					rSplit = outRead / int64(readTargets)
+				}
+				if (edge.TrafficType == "all" || edge.TrafficType == "write") && writeTargets > 0 {
+					wSplit = outWrite / int64(writeTargets)
+				}
+				mSplit = malOutput / int64(len(downstreamEdges))
+
+				// 特殊邏輯：MQ PULL 模式
 				if comp.Type == component.MessageQueue {
 					if mode, ok := comp.Properties["delivery_mode"].(string); ok && mode == "PULL" {
-						downstreamComp, exists := compMap[nextID]
+						downstreamComp, exists := compMap[edge.ToID]
 						if exists {
 							dsMaxCap := getMaxPotentialCapacity(downstreamComp)
-							// MQ PULL 模式下，下游拉取量受限於自身容量
-							if dsMaxCap > 0 && (finalReadSplit+finalWriteSplit) > dsMaxCap {
-								// 按比例分配讀寫流量
-								totalSplit := finalReadSplit + finalWriteSplit
+							if dsMaxCap > 0 && (rSplit+wSplit) > dsMaxCap {
+								totalSplit := rSplit + wSplit
 								if totalSplit > 0 {
 									ratio := float64(dsMaxCap) / float64(totalSplit)
-									finalReadSplit = int64(float64(finalReadSplit) * ratio)
-									finalWriteSplit = int64(float64(finalWriteSplit) * ratio)
+									rSplit = int64(float64(rSplit) * ratio)
+									wSplit = int64(float64(wSplit) * ratio)
 								}
 							}
 						}
 					}
 				}
 
-				propagateFlow(nextID, finalReadSplit, finalWriteSplit, finalMalSplit, newPathVisited)
+				propagateFlow(edge.ToID, rSplit, wSplit, mSplit, newPathVisited)
 			}
 		}
 	}
 
 	for _, root := range roots {
 		compLoads[root] = currentQPS + currentMaliciousQPS
+		compReadLoads[root] = currentReadQPS
+		compWriteLoads[root] = currentWriteQPS
 		visited[root] = true
 		
-		downstreamCount := int64(len(adj[root]))
-		if downstreamCount > 0 {
-			splitRead := currentReadQPS / downstreamCount
-			splitWrite := currentWriteQPS / downstreamCount
-			malSplit := currentMaliciousQPS / downstreamCount
-			for _, nextID := range adj[root] {
-				propagateFlow(nextID, splitRead, splitWrite, malSplit, make(map[string]bool))
+		downstreamEdges := adj[root]
+		if len(downstreamEdges) > 0 {
+			// 同樣需要計算分流
+			readTargets := 0
+			writeTargets := 0
+			for _, edge := range downstreamEdges {
+				if edge.TrafficType == "all" || edge.TrafficType == "read" {
+					readTargets++
+				}
+				if edge.TrafficType == "all" || edge.TrafficType == "write" {
+					writeTargets++
+				}
+			}
+
+			for _, edge := range downstreamEdges {
+				var rSplit, wSplit, mSplit int64
+				if (edge.TrafficType == "all" || edge.TrafficType == "read") && readTargets > 0 {
+					rSplit = currentReadQPS / int64(readTargets)
+				}
+				if (edge.TrafficType == "all" || edge.TrafficType == "write") && writeTargets > 0 {
+					wSplit = currentWriteQPS / int64(writeTargets)
+				}
+				mSplit = currentMaliciousQPS / int64(len(downstreamEdges))
+				
+				propagateFlow(edge.ToID, rSplit, wSplit, mSplit, make(map[string]bool))
 			}
 		}
 	}

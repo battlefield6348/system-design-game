@@ -51,6 +51,7 @@ const CustomEdge = ({
   const readLoad = targetNode?.data?.read_load || 0;
   const writeLoad = targetNode?.data?.write_load || 0;
   const totalLoad = readLoad + writeLoad;
+  const trafficType = data?.traffic_type || 'all';
 
   // 計算線條粗細（基於流量大小）
   const maxWidth = 4;
@@ -77,27 +78,27 @@ const CustomEdge = ({
       {totalLoad > 0 ? (
         <>
           {/* 上方：讀取流量（藍色線） */}
-          {readLoad > 0 && (
+          {readLoad > 0 && (trafficType === 'all' || trafficType === 'read') && (
             <BaseEdge
               path={edgePath}
               markerEnd={markerEnd}
               style={{
                 stroke: '#60a5fa',
                 strokeWidth: readWidth,
-                transform: 'translateY(-3px)',
+                transform: trafficType === 'all' ? 'translateY(-3px)' : 'none',
                 opacity: 0.9,
               }}
             />
           )}
 
           {/* 下方：寫入流量（橘色線） */}
-          {writeLoad > 0 && (
+          {writeLoad > 0 && (trafficType === 'all' || trafficType === 'write') && (
             <BaseEdge
               path={edgePath}
               style={{
                 stroke: '#fb923c',
                 strokeWidth: writeWidth,
-                transform: 'translateY(3px)',
+                transform: trafficType === 'all' ? 'translateY(3px)' : 'none',
                 opacity: 0.9,
                 strokeDasharray: '6, 3',
               }}
@@ -105,11 +106,15 @@ const CustomEdge = ({
           )}
         </>
       ) : (
-        /* 預設灰色線（無流量時） */
+        /* 預設線（無流量時） */
         <BaseEdge
           path={edgePath}
           markerEnd={markerEnd}
-          style={{ stroke: isHovered ? '#818cf8' : '#334155', strokeWidth: isHovered ? 4 : 2 }}
+          style={{
+            stroke: isHovered ? (trafficType === 'read' ? '#60a5fa' : trafficType === 'write' ? '#fb923c' : '#818cf8') : (trafficType === 'read' ? 'rgba(96, 165, 250, 0.4)' : trafficType === 'write' ? 'rgba(251, 146, 60, 0.4)' : '#334155'),
+            strokeWidth: isHovered ? 4 : 2,
+            strokeDasharray: trafficType === 'write' ? '5, 5' : 'none'
+          }}
         />
       )}
       <EdgeLabelRenderer>
@@ -138,13 +143,23 @@ const CustomEdge = ({
                 borderRadius: '6px',
                 border: '1px solid rgba(99, 102, 241, 0.3)',
                 display: 'flex',
-                gap: '8px',
-                fontSize: '0.7rem',
+                flexDirection: 'column',
+                gap: '2px',
+                fontSize: '0.75rem',
+                minWidth: '80px',
                 fontWeight: 600,
                 boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
               }}>
-                <span style={{ color: '#60a5fa' }}>📖 {targetNode.data.read_load.toFixed(0)}</span>
-                <span style={{ color: '#fb923c' }}>✍️ {targetNode.data.write_load.toFixed(0)}</span>
+                <div style={{ color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '2px', marginBottom: '2px', display: 'flex', justifyContent: 'space-between' }}>
+                  <span>模式:</span>
+                  <span style={{ color: trafficType === 'read' ? '#60a5fa' : trafficType === 'write' ? '#fb923c' : '#818cf8' }}>
+                    {trafficType === 'read' ? '僅讀取' : trafficType === 'write' ? '僅寫入' : '全部流量'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '8px' }}>
+                  <span style={{ color: '#60a5fa' }}>📖 {targetNode.data.read_load.toFixed(0)}</span>
+                  <span style={{ color: '#fb923c' }}>✍️ {targetNode.data.write_load.toFixed(0)}</span>
+                </div>
               </div>
             )}
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
@@ -712,7 +727,10 @@ function Game() {
     const newEdge = {
       ...params,
       type: 'custom',
-      data: { onDelete: deleteEdge }
+      data: {
+        onDelete: deleteEdge,
+        traffic_type: 'all' // 預設全部流量
+      }
     };
     setEdges((eds) => addEdge(newEdge, eds));
   }, [setEdges, deleteEdge, nodes, edges]);
@@ -1343,6 +1361,57 @@ function Game() {
                       {selectedNode.data.type === 'OBJECT_STORAGE' && "提示：高持久性的物件儲存服務 (如 S3)，幾乎不會崩潰。"}
                       {selectedNode.data.type === 'SEARCH_ENGINE' && "提示：專門處理全文搜索請求，比資料庫更適合大量讀取。"}
                     </div>
+                  </div>
+                );
+              })()}
+            </div>
+          ) : edges.find(e => e.selected) ? (
+            <div className="property-editor">
+              <div className="property-header">
+                <h3>連線設定</h3>
+              </div>
+              {(() => {
+                const selectedEdge = edges.find(e => e.selected);
+                return (
+                  <div className="props-form">
+                    <div className="prop-group">
+                      <label>流量分流模式 (Traffic Split)</label>
+                      <div className="traffic-mode-picker">
+                        <button
+                          className={`mode-btn ${(!selectedEdge.data?.traffic_type || selectedEdge.data?.traffic_type === 'all') ? 'active' : ''}`}
+                          onClick={() => {
+                            setEdges(eds => eds.map(e => e.id === selectedEdge.id ? { ...e, data: { ...e.data, traffic_type: 'all' } } : e));
+                          }}
+                        >
+                          <div className="mode-icon all"></div>
+                          <span>全部</span>
+                        </button>
+                        <button
+                          className={`mode-btn ${selectedEdge.data?.traffic_type === 'read' ? 'active' : ''}`}
+                          onClick={() => {
+                            setEdges(eds => eds.map(e => e.id === selectedEdge.id ? { ...e, data: { ...e.data, traffic_type: 'read' } } : e));
+                          }}
+                        >
+                          <div className="mode-icon read"></div>
+                          <span>僅讀取</span>
+                        </button>
+                        <button
+                          className={`mode-btn ${selectedEdge.data?.traffic_type === 'write' ? 'active' : ''}`}
+                          onClick={() => {
+                            setEdges(eds => eds.map(e => e.id === selectedEdge.id ? { ...e, data: { ...e.data, traffic_type: 'write' } } : e));
+                          }}
+                        >
+                          <div className="mode-icon write"></div>
+                          <span>僅寫入</span>
+                        </button>
+                      </div>
+                    </div>
+                    <p className="help-text" style={{ marginTop: '1rem' }}>
+                      手動指定此路徑傳遞的流量類型。此設定可用於實現「讀寫分離」架構。
+                    </p>
+                    <button className="btn-secondary" onClick={() => setEdges(eds => eds.map(e => ({ ...e, selected: false })))}>
+                      關閉設定
+                    </button>
                   </div>
                 );
               })()}

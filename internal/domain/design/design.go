@@ -4,9 +4,10 @@ import "system-design-game/internal/domain/component"
 
 // Connection 定義組件之間的連通性
 type Connection struct {
-	FromID string `json:"from_id"`
-	ToID   string `json:"to_id"`
-	Protocol string `json:"protocol"` // 如：HTTP, GPRC, TCP
+	FromID      string `json:"from_id"`
+	ToID        string `json:"to_id"`
+	Protocol    string `json:"protocol"`     // 如：HTTP, GPRC, TCP
+	TrafficType string `json:"traffic_type"` // "all", "read", "write"
 }
 
 // Design 代表玩家設計的完整系統拓撲
