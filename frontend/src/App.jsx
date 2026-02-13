@@ -1324,21 +1324,6 @@ function Game() {
                 )}
               </div>
 
-              {hoveredTool && (
-                <div
-                  className="tool-intro-card"
-                  style={{
-                    position: 'fixed',
-                    left: mousePos.x + 20,
-                    top: mousePos.y - 40,
-                    pointerEvents: 'none',
-                    zIndex: 9999
-                  }}
-                >
-                  <h4>{hoveredTool.name}</h4>
-                  <p>{toolDescriptions[hoveredTool.type]}</p>
-                </div>
-              )}
             </div>
           )}
 
@@ -1456,6 +1441,22 @@ function Game() {
             最大延遲: {selectedScenario.goal.max_latency_ms}ms |
             可用性 &gt; {selectedScenario.goal.availability}%
           </div>
+        </div>
+      )}
+
+      {hoveredTool && (
+        <div
+          className="tool-intro-card"
+          style={{
+            position: 'fixed',
+            left: mousePos.x + 20,
+            top: mousePos.y - 40,
+            pointerEvents: 'none',
+            zIndex: 9999
+          }}
+        >
+          <h4>{hoveredTool.name}</h4>
+          <p>{toolDescriptions[hoveredTool.type]}</p>
         </div>
       )}
     </div>
