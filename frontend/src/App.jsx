@@ -1208,16 +1208,33 @@ function Game() {
             panOnDrag={[1, 2]} // 改為中鍵或右鍵平移畫布，左鍵留給框選
             panOnScroll={true} // 允許滾輪平移
             selectionMode="partial"
+            onDrop={onDrop}
+            onDragOver={onDragOver}
           >
-            <Background color="#333" gap={20} />
+            <Background color="#334155" variant="dots" />
             <Controls />
             <MiniMap
-              nodeStrokeWidth={3}
+              style={{ height: 120, width: 150 }}
+              nodeColor={(n) => {
+                if (n.data.type === 'TRAFFIC_SOURCE') return '#f43f5e';
+                if (n.data.type === 'DATABASE') return '#10b981';
+                return '#6366f1';
+              }}
+              maskColor="rgba(0, 0, 0, 0.3)"
               zoomable
               pannable
-              nodeColor="#64748b"
-              maskColor="rgba(30, 41, 59, 0.8)"
             />
+            {/* 右下角重置漂浮按鈕 */}
+            <div className="fab-container">
+              <button
+                className="fab-reset"
+                onClick={resetSimulation}
+                title="重置模擬狀態"
+              >
+                <RotateCcw size={20} />
+                <span>重置流量</span>
+              </button>
+            </div>
           </ReactFlow>
         </section>
       </main>
