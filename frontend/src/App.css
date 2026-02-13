@@ -428,6 +428,16 @@ body {
   --node-color-rgb: 59, 130, 246;
 }
 
+.custom-node.api_gateway {
+  --node-color: #f472b6;
+  --node-color-rgb: 244, 114, 182;
+}
+
+.custom-node.nosql {
+  --node-color: #14b8a6;
+  --node-color-rgb: 20, 184, 166;
+}
+
 .custom-node.cdn {
   --node-color: #06b6d4;
   --node-color-rgb: 6, 182, 212;

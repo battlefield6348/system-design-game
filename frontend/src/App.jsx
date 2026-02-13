@@ -377,9 +377,11 @@ function Game() {
   };
 
   const toolDescriptions = {
-    'NANO_SERVER': '入門級節點 (200 QPS)。適合初期流量或輕量服務，部署成本極低。',
-    'STANDARD_SERVER': '標準運算節點 (1k QPS)。效能平衡點，適合大多數業務邏輯處理。',
-    'HIGH_PERF_SERVER': '最強效能節點 (5k QPS)。雖然昂貴，但在處理複雜計算與高併發時最為穩定。',
+    'NANO_SERVER': '極輕量伺服器，適合處理低流量、高併發的簡單請求 (例如 Health Check)。',
+    'STANDARD_SERVER': '通用型伺服器，處理能力均衡，適合大部分 Web 應用程式。',
+    'HIGH_PERF_SERVER': '高效能運算伺服器，搭載更多核心，適合複雜業務與高負載場景。',
+    'API_GATEWAY': '系統入口關鍵組件，提供流量治理、安全防護與監控，並能降低後端負擔。',
+    'NOSQL': '非關聯式資料庫，適合處理非結構化數據與極高併發的讀寫場景，但犧牲強一致性。',
     'AUTO_SCALING_GROUP': '自動擴縮容叢集。能根據 CPU 或負載自動增減機器數量，應對突發流量的首選。',
     'LOAD_BALANCER': '流量分發器。確保後端伺服器負載均衡，避免單點故障。',
     'CDN': '全球邊緣快取。緩存靜態資源與圖片，能擋掉 80% 以上的回源請求。',
@@ -1223,6 +1225,17 @@ function Game() {
                     </button>
                     <button
                       onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'API Gateway', type: 'API_GATEWAY' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('API_GATEWAY', 'API Gateway', Layout, { max_qps: 50000, base_latency: 2, operational_cost: 0.15 })}
+                    >
+                      <Plus size={14} /> API Gateway
+                    </button>
+                    <button
+                      onMouseEnter={(e) => {
                         setHoveredTool({ name: 'CDN 傳遞', type: 'CDN' });
                         setMousePos({ x: e.clientX, y: e.clientY });
                       }}
@@ -1261,9 +1274,20 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('DATABASE', '資料庫 (RDB)', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0, base_latency: 50, operational_cost: 0.5 })}
+                      onClick={() => addComponent('DATABASE', 'SQL 資料庫 (PostgreSQL)', Database, { max_qps: 2000, base_latency: 50, setup_cost: 500, operational_cost: 0.5, replication_mode: 'SINGLE', slave_count: 0 })}
                     >
                       <Plus size={14} /> SQL 資料庫
+                    </button>
+                    <button
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'NoSQL 資料庫', type: 'NOSQL' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('NOSQL', 'NoSQL (MongoDB)', HardDrive, { max_qps: 10000, base_latency: 10, setup_cost: 400, operational_cost: 0.4 })}
+                    >
+                      <Plus size={14} /> NoSQL 資料庫
                     </button>
                     <button
                       onMouseEnter={(e) => {

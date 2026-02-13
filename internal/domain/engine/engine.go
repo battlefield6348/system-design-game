@@ -225,6 +225,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			case component.Database: compCost = 0.5
 			case component.Cache: compCost = 0.3
 			case component.WebServer: compCost = 0.2
+			case component.APIGateway: compCost = 0.15
+			case component.NoSQL: compCost = 0.4
 			}
 		}
 		totalOperationalCost += compCost
@@ -249,6 +251,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			case component.Cache, component.CDN:
 				totalBaseLatency += 2.0
 				consistencyScore -= 10.0 // Cache 引入資料不一致風險
+			case component.APIGateway:
+				totalBaseLatency += 2.0
+			case component.NoSQL:
+				totalBaseLatency += 10.0
+				consistencyScore -= 15.0 // NoSQL 通常為最終一致性
 			}
 		}
 
@@ -359,8 +366,22 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			actualProcessed = int64(float64(input) * 0.98)      // 誤殺 2% 正面流量
 		}
 		// 安全事件判定
-		if comp.Type == component.Database && actualMalProcessed > 0 {
-			securityIncidents += float64(actualMalProcessed)
+		if (comp.Type == component.Database || comp.Type == component.NoSQL) && actualMalProcessed > 0 {
+			// API Gateway 可以擋掉一部分未經授權的流量 (簡化模擬)
+			// 如果流量路徑中有經過 API Gateway，則降低安全威脅
+			isProtected := false
+			for vid := range visited {
+				if compMap[vid].Type == component.APIGateway {
+					isProtected = true
+					break
+				}
+			}
+			
+			threat := float64(actualMalProcessed)
+			if isProtected {
+				threat *= 0.5 // 有 Gateway 保護，威脅減半
+			}
+			securityIncidents += threat
 		}
 
 		// Message Queue 特殊邏輯... (略)
@@ -437,7 +458,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		if comp.Type == component.Cache || comp.Type == component.CDN {
 			// 快取命中的部分算成功
 			fulfilled = actualProcessed - outputQPS
-		} else if comp.Type == component.Database || comp.Type == component.ObjectStorage || comp.Type == component.SearchEngine {
+		} else if comp.Type == component.Database || comp.Type == component.NoSQL || comp.Type == component.ObjectStorage || comp.Type == component.SearchEngine {
 			// 直接抵達資料庫或儲存層算成功
 			fulfilled = actualProcessed
 		}
@@ -616,6 +637,8 @@ func getCompMaxQPS(comp component.Component) int64 {
 			// 主從架構：Slaves 增加讀取 QPS 能力 (假設提升 100% per slave)
 			return base * int64(1+slaves)
 		}
+	} else if comp.Type == component.NoSQL || comp.Type == component.APIGateway {
+		return base
 	}
 	return base
 }

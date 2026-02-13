@@ -15,6 +15,8 @@ const (
 	ObjectStorage Type = "OBJECT_STORAGE"
 	SearchEngine  Type = "SEARCH_ENGINE"
 	AutoScalingGroup  Type = "AUTO_SCALING_GROUP"
+	APIGateway        Type = "API_GATEWAY"
+	NoSQL             Type = "NOSQL"
 )
 
 // Component 代表系統中的一個最小單位
