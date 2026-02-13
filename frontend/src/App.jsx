@@ -17,7 +17,7 @@ import {
   useNodes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock, Terminal, Award, AlertTriangle, CheckCircle2, Film } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock, Terminal, Award, AlertTriangle, CheckCircle2, Film, Trash2, RefreshCw, ChevronUp, ExternalLink } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -514,7 +514,9 @@ function Game() {
     'SEARCH_ENGINE': '搜尋引擎 (ES)。解決資料庫在全文檢索下的效能瓶頸，熱搜必備。',
     'CACHE': '極速快取 (Redis)。將熱點數據放進內容中，讓 API 延遲縮短至 1ms 以內。',
     'MESSAGE_QUEUE': '異步訊息隊列 (Kafka)。讓系統組件解耦，具備削峰填谷能力。',
-    'WORKER': '後端處理單元。專門從 Message Queue 獲取任務並執行，適合處理耗時的寫入操作或數據分析。'
+    'WORKER': '後端處理單元。專門從 Message Queue 獲取任務並執行，適合處理耗時的寫入操作或數據分析。',
+    'VIDEO_TRANSCODING': '影片轉碼服務。將影片轉換為不同格式和解析度，耗時且資源密集。',
+    'EXTERNAL_API': '第三方服務。例如金流、簡訊、地圖等，通常有 QPS 限制和 SLA 保證。'
   };
 
   // 初始化取得關卡列表
@@ -1350,6 +1352,38 @@ function Game() {
                       </div>
                     )}
 
+                    {/* External API Specific Settings */}
+                    {selectedNode.data.type === 'EXTERNAL_API' && (
+                      <>
+                        <div className="prop-group">
+                          <label>服務等級協議 (SLA)</label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="0"
+                            max="100"
+                            value={selectedNode.data.properties.sla || 99.9}
+                            onChange={(e) => {
+                              const val = parseFloat(e.target.value) || 0;
+                              setNodes(nds => nds.map(n => {
+                                if (n.id === selectedNode.id) {
+                                  return {
+                                    ...n,
+                                    data: {
+                                      ...n.data,
+                                      properties: { ...n.data.properties, sla: val }
+                                    }
+                                  };
+                                }
+                                return n;
+                              }));
+                            }}
+                          />
+                          <p className="help-text">第三方服務的可用性百分比，影響其穩定性。</p>
+                        </div>
+                      </>
+                    )}
+
                     <button className="btn-secondary" onClick={() => setNodes(nds => nds.map(n => ({ ...n, selected: false })))}>
                       關閉設定
                     </button>
@@ -1360,6 +1394,7 @@ function Game() {
                       {selectedNode.data.type === 'WAF' && "提示：WAF 用於過濾惡意流量，保護後端安全。"}
                       {selectedNode.data.type === 'OBJECT_STORAGE' && "提示：高持久性的物件儲存服務 (如 S3)，幾乎不會崩潰。"}
                       {selectedNode.data.type === 'SEARCH_ENGINE' && "提示：專門處理全文搜索請求，比資料庫更適合大量讀取。"}
+                      {selectedNode.data.type === 'EXTERNAL_API' && "提示：第三方服務的穩定性由 SLA 決定，且通常有 QPS 限制。"}
                     </div>
                   </div>
                 );
@@ -1633,6 +1668,28 @@ function Game() {
                       onClick={() => addComponent('VIDEO_TRANSCODING', '影片轉碼服務', Film, { max_qps: 100, base_latency: 5000, setup_cost: 1000, operational_cost: 1.5 })}
                     >
                       <Plus size={14} /> 影片轉碼
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <div className={`tool-category ${expandedCategories.integration ? 'expanded' : ''}`}>
+                <div className="category-header" onClick={() => toggleCategory('integration')}>
+                  <h3>Integration 整合服務</h3>
+                  {expandedCategories.integration ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                </div>
+                {expandedCategories.integration && (
+                  <div className="tool-list drawer-content">
+                    <button
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: '第三方服務', type: 'EXTERNAL_API' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('EXTERNAL_API', '外部 API (第三方)', Globe, { max_qps: 1000, base_latency: 200, sla: 99.9, operational_cost: 0.1 })}
+                    >
+                      <Plus size={14} /> 第三方服務
                     </button>
                   </div>
                 )}

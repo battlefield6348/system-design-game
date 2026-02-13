@@ -577,6 +577,11 @@ body {
     --node-color-rgb: 234, 179, 8;
   }
 
+  .custom-node.external_api {
+    --node-color: #818cf8;
+    --node-color-rgb: 129, 140, 248;
+  }
+
   /* Apply variable to handles */
   .custom-node .react-flow__handle {
     background: var(--node-color, #64748b) !important;

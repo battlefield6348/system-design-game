@@ -313,6 +313,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			case component.NoSQL:
 				totalBaseLatency += 10.0
 				consistencyScore -= 15.0 // NoSQL 通常為最終一致性
+			case component.ExternalAPI:
+				totalBaseLatency += 200.0 // 第三方服務通常很慢
 			}
 		}
 
@@ -496,6 +498,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		case component.Database, component.NoSQL:
 			ram += 30.0 + (effectiveLoadForRAM / 10000.0) * 20.0
+		case component.ExternalAPI:
+			// 外部 API 不佔我們自己的資源，基礎佔用極低
+			ram = 5.0 
+			cpu = 2.0
 		default:
 			if effectiveMaxForRAM > 0 {
 				ram += (effectiveLoadForRAM / 20000.0) * 10.0
@@ -525,6 +531,19 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			actualMalProcessed = int64(float64(mal) * 0.1)
 			actualRead = int64(float64(read) * 0.98)
 			actualWrite = int64(float64(write) * 0.98)
+		}
+		
+		// 外部 API 特定邏輯：模擬 SLA 丟包與按量計費
+		if comp.Type == component.ExternalAPI {
+			sla := 0.99
+			if v, ok := comp.Properties["sla"].(float64); ok {
+				sla = v / 100.0
+			}
+			actualRead = int64(float64(actualRead) * sla)
+			actualWrite = int64(float64(actualWrite) * sla)
+			
+			// 額外計費：模擬第三方服務按量收費 (例如每 1000 請求 $0.1)
+			totalOperationalCost += float64(actualRead+actualWrite) * 0.0001
 		}
 		
 		// 資源放大效應：寫入操作通常比讀取消耗多 3-5 倍 CPU

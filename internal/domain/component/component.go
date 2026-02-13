@@ -19,6 +19,7 @@ const (
 	NoSQL             Type = "NOSQL"
 	Worker            Type = "WORKER"
 	VideoTranscoding  Type = "VIDEO_TRANSCODING"
+	ExternalAPI       Type = "EXTERNAL_API"
 )
 
 // Component 代表系統中的一個最小單位
