@@ -1208,8 +1208,6 @@ function Game() {
             panOnDrag={[1, 2]} // 改為中鍵或右鍵平移畫布，左鍵留給框選
             panOnScroll={true} // 允許滾輪平移
             selectionMode="partial"
-            onDrop={onDrop}
-            onDragOver={onDragOver}
           >
             <Background color="#334155" variant="dots" />
             <Controls />
