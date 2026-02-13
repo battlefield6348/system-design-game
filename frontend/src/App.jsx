@@ -1025,26 +1025,9 @@ function Game() {
 
                     {selectedNode.data.type === 'TRAFFIC_SOURCE' && (
                       <div className="prop-group">
-                        <label>讀取佔比 (Read Ratio: {selectedNode.data.properties.read_ratio || 80}%)</label>
-                        <input
-                          type="range" min="0" max="100"
-                          value={selectedNode.data.properties.read_ratio || 80}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value);
-                            setNodes(nds => nds.map(n => {
-                              if (n.id === selectedNode.id) {
-                                return {
-                                  ...n,
-                                  data: {
-                                    ...n.data,
-                                    properties: { ...n.data.properties, read_ratio: val }
-                                  }
-                                };
-                              }
-                              return n;
-                            }));
-                          }}
-                        />
+                        <p style={{ fontSize: '0.85rem', color: '#a0aec0', fontStyle: 'italic' }}>
+                          請使用上方控制列調整流量大小與讀寫佔比。
+                        </p>
                       </div>
                     )}
 
