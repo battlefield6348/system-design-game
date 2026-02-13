@@ -20,22 +20,55 @@ func NewInMemScenarioRepository() *InMemScenarioRepository {
 
 func (r *InMemScenarioRepository) initMockData() {
 	s1 := &scenario.Scenario{
-		ID:          "s1",
+		ID:          "tinyurl",
 		Title:       "短網址系統 (TinyURL)",
-		Description: "設計一個每秒處理 10k 請求的短網址系統，支援流量從 100 到 10,000 的指數級增長。",
+		Description: "設計一個高讀取的短網址系統。挑戰：在極低預算下處理 100k 的跳轉請求，必須善用 Cache。",
 		Goal: scenario.Goal{
-			MinQPS:        10000,
-			MaxLatencyMS: 200,
+			MinQPS:        100000,
+			MaxLatencyMS: 50,
 			Availability: 99.9,
-			Duration:     60, // 持續 60 秒的測試
+			Duration:     300,
 		},
 		Phases: []scenario.TrafficPhase{
-			{Name: "初期上線", StartQPS: 100, EndQPS: 1000, DurationSeconds: 60},    // 1 分鐘成長到 1k
-			{Name: "口碑傳播", StartQPS: 1000, EndQPS: 5000, DurationSeconds: 120},  // 2 分鐘成長到 5k
-			{Name: "流量巔峰", StartQPS: 5000, EndQPS: 10000, DurationSeconds: 300}, // 5 分鐘成長到 10k
+			{Name: "穩定增長", StartQPS: 1000, EndQPS: 100000, DurationSeconds: 300},
 		},
 	}
+
+	s2 := &scenario.Scenario{
+		ID:          "flash-sale",
+		Title:       "快閃搶購 (Flash Sale)",
+		Description: "雙 11 搶購活動。挑戰：在 10 秒內應對從 0 到 500k 的突發流量，需使用 MQ 消峰填谷。",
+		Goal: scenario.Goal{
+			MinQPS:        500000,
+			MaxLatencyMS: 500,
+			Availability: 95.0,
+			Duration:     60,
+		},
+		Phases: []scenario.TrafficPhase{
+			{Name: "熱身", StartQPS: 100, EndQPS: 1000, DurationSeconds: 30},
+			{Name: "開賣瞬間", StartQPS: 1000, EndQPS: 500000, DurationSeconds: 10},
+			{Name: "餘溫", StartQPS: 500000, EndQPS: 10000, DurationSeconds: 20},
+		},
+	}
+
+	s3 := &scenario.Scenario{
+		ID:          "video-platform",
+		Title:       "影音串流 (Netflix/YouTube)",
+		Description: "全球化的影音平台。挑戰：降低跨國延遲，提升內容分發效率，需善用 CDN 與 Object Storage。",
+		Goal: scenario.Goal{
+			MinQPS:        50000,
+			MaxLatencyMS: 20,
+			Availability: 99.99,
+			Duration:     600,
+		},
+		Phases: []scenario.TrafficPhase{
+			{Name: "全球高峰", StartQPS: 5000, EndQPS: 50000, DurationSeconds: 600},
+		},
+	}
+
 	r.scenarios[s1.ID] = s1
+	r.scenarios[s2.ID] = s2
+	r.scenarios[s3.ID] = s3
 }
 
 func (r *InMemScenarioRepository) GetByID(id string) (*scenario.Scenario, error) {

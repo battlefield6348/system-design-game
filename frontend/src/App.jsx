@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -358,6 +358,24 @@ function Game() {
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
   const [retentionRate, setRetentionRate] = useState(1.0);
+  const [scenarios, setScenarios] = useState([]);
+  const [selectedScenario, setSelectedScenario] = useState(null);
+  const [showScenarioModal, setShowScenarioModal] = useState(false);
+
+  // 初始化取得關卡列表
+  useEffect(() => {
+    if (isWasmLoaded && window.goListScenarios) {
+      try {
+        const res = JSON.parse(window.goListScenarios());
+        setScenarios(res);
+        if (res.length > 0 && !selectedScenario) {
+          setSelectedScenario(res[0]);
+        }
+      } catch (e) {
+        console.error("Failed to fetch scenarios", e);
+      }
+    }
+  }, [isWasmLoaded, selectedScenario]);
 
   const resetSimulation = () => {
     setGameTime(0);
@@ -580,7 +598,7 @@ function Game() {
     // 將 React Flow 狀態轉換為 Go 領域模型
     const design = {
       id: "live-design",
-      scenario_id: "s1",
+      scenario_id: selectedScenario?.id || "tinyurl",
       components: nodes.map(n => ({
         id: n.id,
         name: n.data.label,
@@ -750,6 +768,14 @@ function Game() {
           {evaluationResult?.is_random_drop && (
             <div className="drop-badge">UNSTABLE!</div>
           )}
+
+          <button
+            className="btn-primary"
+            onClick={() => setShowScenarioModal(true)}
+            title="選擇挑戰情境"
+          >
+            <Target size={16} /> {selectedScenario?.title || '選擇場景'}
+          </button>
 
           {/* 自動排版按鈕 */}
           <button
@@ -1193,6 +1219,53 @@ function Game() {
           </ReactFlow>
         </section>
       </main>
+
+      {/* Scenario Selection Modal */}
+      {showScenarioModal && (
+        <div className="modal-overlay">
+          <div className="scenario-modal">
+            <div className="modal-header">
+              <h2>選擇系統設計挑戰</h2>
+              <button onClick={() => setShowScenarioModal(false)}><X /></button>
+            </div>
+            <div className="scenario-list">
+              {scenarios.map(s => (
+                <div
+                  key={s.id}
+                  className={`scenario-card ${selectedScenario?.id === s.id ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedScenario(s);
+                    setShowScenarioModal(false);
+                    resetSimulation();
+                  }}
+                >
+                  <div className="card-header">
+                    <h4>{s.title}</h4>
+                    {selectedScenario?.id === s.id && <Trophy size={16} color="var(--warning)" />}
+                  </div>
+                  <p>{s.description}</p>
+                  <div className="card-goals">
+                    <span>目標 QPS: {(s.goal.min_qps / 1000).toFixed(0)}k</span>
+                    <span>允許可忍受延遲: {s.goal.max_latency_ms}ms</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Goal Overlay */}
+      {selectedScenario && (
+        <div className="goal-overlay">
+          <div className="goal-title">當前挑戰: {selectedScenario.title}</div>
+          <div className="goal-progress">
+            目標 QPS: {(selectedScenario.goal.min_qps / 1000).toFixed(0)}k |
+            最大延遲: {selectedScenario.goal.max_latency_ms}ms |
+            可用性 &gt; {selectedScenario.goal.availability}%
+          </div>
+        </div>
+      )}
     </div>
   );
 }

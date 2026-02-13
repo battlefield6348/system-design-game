@@ -26,6 +26,7 @@ func main() {
 	// 暴露函數給 JavaScript
 	js.Global().Set("goEvaluate", js.FuncOf(evaluate))
 	js.Global().Set("goSaveDesign", js.FuncOf(saveDesign))
+	js.Global().Set("goListScenarios", js.FuncOf(listScenarios))
 
 	fmt.Println("Wasm 模組已載入")
 
@@ -72,4 +73,14 @@ func saveDesign(this js.Value, args []js.Value) interface{} {
 	}
 
 	return nil
+}
+
+func listScenarios(this js.Value, args []js.Value) interface{} {
+	scenarios, err := scenarioRepo.ListAll()
+	if err != nil {
+		return "取得關卡失敗: " + err.Error()
+	}
+
+	jsonRes, _ := json.Marshal(scenarios)
+	return string(jsonRes)
 }
