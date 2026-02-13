@@ -1310,6 +1310,12 @@ body {
   }
 }
 
+@keyframes dash {
+  to {
+    stroke-dashoffset: -15;
+  }
+}
+
 .asg-instance-grid {
   display: flex;
   flex-direction: column;

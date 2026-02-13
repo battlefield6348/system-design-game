@@ -47,6 +47,13 @@ const CustomEdge = ({
     targetPosition,
   });
 
+  // 計算讀寫比例
+  const readLoad = targetNode?.data?.read_load || 0;
+  const writeLoad = targetNode?.data?.write_load || 0;
+  const totalLoad = readLoad + writeLoad;
+  const readRatio = totalLoad > 0 ? readLoad / totalLoad : 0.5;
+  const writeRatio = totalLoad > 0 ? writeLoad / totalLoad : 0.5;
+
   return (
     <g
       onMouseEnter={() => setIsHovered(true)}
@@ -62,22 +69,51 @@ const CustomEdge = ({
         className="react-flow__edge-interaction"
         style={{ cursor: 'pointer', pointerEvents: 'all' }}
       />
-      {/* 底層實線 */}
-      <BaseEdge
-        path={edgePath}
-        markerEnd={markerEnd}
-        style={{ ...style, stroke: isHovered ? '#818cf8' : '#334155', strokeWidth: isHovered ? 4 : 2 }}
-      />
-      {/* 頂層流動脈衝 */}
-      {data?.animated && (
+
+      {/* 底層：讀取流量（藍色） */}
+      {totalLoad > 0 && readLoad > 0 && (
+        <BaseEdge
+          path={edgePath}
+          markerEnd={markerEnd}
+          style={{
+            stroke: '#60a5fa',
+            strokeWidth: Math.max(2, 8 * readRatio),
+            opacity: 0.8,
+          }}
+        />
+      )}
+
+      {/* 頂層：寫入流量（橘色） */}
+      {totalLoad > 0 && writeLoad > 0 && (
         <BaseEdge
           path={edgePath}
           style={{
-            ...style,
-            stroke: '#6366f1',
-            strokeWidth: 3,
-            animationDuration: data.load ? `${Math.max(0.5, 3 - (data.load / 5000))}s` : '1.5s',
-            strokeDasharray: data.load ? `5, ${Math.max(20, 100 - (data.load / 100))}` : '10, 90'
+            stroke: '#fb923c',
+            strokeWidth: Math.max(2, 8 * writeRatio),
+            opacity: 0.8,
+            strokeDasharray: '8, 4',
+          }}
+        />
+      )}
+
+      {/* 預設灰色線（無流量時） */}
+      {totalLoad === 0 && (
+        <BaseEdge
+          path={edgePath}
+          markerEnd={markerEnd}
+          style={{ stroke: isHovered ? '#818cf8' : '#334155', strokeWidth: isHovered ? 4 : 2 }}
+        />
+      )}
+
+      {/* 流動動畫效果 */}
+      {totalLoad > 0 && (
+        <BaseEdge
+          path={edgePath}
+          style={{
+            stroke: 'rgba(255, 255, 255, 0.3)',
+            strokeWidth: 2,
+            strokeDasharray: '5, 10',
+            animation: 'dash 1s linear infinite',
           }}
           className="animated"
         />
