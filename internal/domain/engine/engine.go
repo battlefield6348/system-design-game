@@ -533,10 +533,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		avgLatency = 5000
 	}
 
-	// 成本評估：如果超過預算可能需要扣分 (假設基礎預算 100/sec)
+	// 成本評估：從關卡讀取預算限制
+	budget := 50.0
+	for _, c := range s.Constraints {
+		if c.Type == "budget" {
+			budget = float64(c.Value)
+		}
+	}
+
 	costScore := 100.0
-	if totalOperationalCost > 50.0 {
-		costScore = math.Max(0, 100.0-(totalOperationalCost-50.0)*2)
+	if totalOperationalCost > budget {
+		// 超過預算每一塊錢扣 5 分 (更嚴厲的預算懲罰)
+		costScore = math.Max(0, 100.0-(totalOperationalCost-budget)*5)
 	}
 
 	if consistencyScore < 0 { consistencyScore = 0 }

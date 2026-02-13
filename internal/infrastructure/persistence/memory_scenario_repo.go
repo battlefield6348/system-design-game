@@ -30,7 +30,10 @@ func (r *InMemScenarioRepository) initMockData() {
 			Duration:     300,
 		},
 		Phases: []scenario.TrafficPhase{
-			{Name: "穩定增長", StartQPS: 1000, EndQPS: 100000, DurationSeconds: 300},
+			{Name: "穩定讀取增長", StartQPS: 1000, EndQPS: 100000, DurationSeconds: 300},
+		},
+		Constraints: []scenario.Constraint{
+			{Type: "budget", Value: 10}, // 極低預算挑戰 ($10/sec)
 		},
 	}
 
@@ -49,6 +52,9 @@ func (r *InMemScenarioRepository) initMockData() {
 			{Name: "開賣瞬間", StartQPS: 1000, EndQPS: 500000, DurationSeconds: 10},
 			{Name: "餘溫", StartQPS: 500000, EndQPS: 10000, DurationSeconds: 20},
 		},
+		Constraints: []scenario.Constraint{
+			{Type: "budget", Value: 30}, // 中等預算
+		},
 	}
 
 	s3 := &scenario.Scenario{
@@ -63,6 +69,9 @@ func (r *InMemScenarioRepository) initMockData() {
 		},
 		Phases: []scenario.TrafficPhase{
 			{Name: "全球高峰", StartQPS: 5000, EndQPS: 50000, DurationSeconds: 600},
+		},
+		Constraints: []scenario.Constraint{
+			{Type: "budget", Value: 100}, // 較高預算，但 CDN 很貴
 		},
 	}
 
