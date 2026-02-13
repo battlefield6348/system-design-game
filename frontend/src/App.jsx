@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -568,7 +568,7 @@ function Game() {
         data: {
           label: '使用者流量',
           type: 'TRAFFIC_SOURCE',
-          icon: Activity,
+          icon: Users,
           onDelete: deleteNode,
           properties: { start_qps: 0 }
         },
@@ -1162,7 +1162,7 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('WEB_SERVER', 'Nano Server', Server, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}
+                      onClick={() => addComponent('WEB_SERVER', 'Nano Server', Cpu, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}
                     >
                       <Plus size={14} /> Nano Server
                     </button>
@@ -1184,7 +1184,7 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Server, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}
+                      onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Activity, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}
                     >
                       <Plus size={14} /> 高效能伺服器
                     </button>
@@ -1217,7 +1217,7 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}
+                      onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Zap, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}
                     >
                       <Plus size={14} /> 負載平衡器
                     </button>
@@ -1239,7 +1239,7 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}
+                      onClick={() => addComponent('WAF', 'WAF (防火牆)', ShieldCheck, { max_qps: 20000 })}
                     >
                       <Plus size={14} /> WAF 防火牆
                     </button>
@@ -1316,7 +1316,7 @@ function Game() {
                       }}
                       onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
-                      onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}
+                      onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', Waves, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}
                     >
                       <Plus size={14} /> Kafka 隊列
                     </button>

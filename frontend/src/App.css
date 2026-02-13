@@ -297,41 +297,42 @@ body {
 
 /* Custom Node Styles */
 .custom-node {
-  background: rgba(30, 41, 59, 0.95);
-  backdrop-filter: blur(8px);
-  border: 2px solid var(--node-color, #334155);
+  padding: 10px 16px;
   border-radius: 16px;
-  padding: 16px;
-  min-width: 220px;
+  background: #0f172a;
+  border: 2px solid var(--node-color, #475569);
   color: white;
-  transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  min-width: 180px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+  position: relative;
 }
 
 .custom-node:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5), 0 0 15px rgba(var(--node-color-rgb), 0.3);
+  z-index: 100 !important;
 }
 
-.custom-node.selected {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.5), 0 0 20px rgba(var(--node-color-rgb), 0.3);
+.custom-node.active {
+  box-shadow: 0 0 20px rgba(var(--node-color-rgb), 0.4);
+  border-color: #fff;
 }
 
-/* Component Specific Colors Config */
+/* Node Types Colors */
 .custom-node.traffic_source {
   --node-color: #f43f5e;
   --node-color-rgb: 244, 63, 94;
 }
 
+.custom-node.web_server {
+  --node-color: #6366f1;
+  --node-color-rgb: 99, 102, 241;
+}
+
 .custom-node.load_balancer {
   --node-color: #8b5cf6;
   --node-color-rgb: 139, 92, 246;
-}
-
-.custom-node.web_server {
-  --node-color: #0ea5e9;
-  --node-color-rgb: 14, 165, 233;
 }
 
 .custom-node.database {
@@ -340,13 +341,13 @@ body {
 }
 
 .custom-node.cache {
-  --node-color: #f97316;
-  --node-color-rgb: 249, 115, 22;
+  --node-color: #f59e0b;
+  --node-color-rgb: 245, 158, 11;
 }
 
 .custom-node.message_queue {
-  --node-color: #ec4899;
-  --node-color-rgb: 236, 72, 153;
+  --node-color: #3b82f6;
+  --node-color-rgb: 59, 130, 246;
 }
 
 .custom-node.cdn {
@@ -381,14 +382,14 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  width: 54px;
+  height: 54px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(var(--node-color-rgb), 0.2), rgba(var(--node-color-rgb), 0.05));
+  border: 1px solid rgba(var(--node-color-rgb), 0.3);
   color: var(--node-color, #fff);
-  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.2);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.2), 0 4px 8px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
 }
 
 /* Specific icon background styling using the variable */
@@ -404,26 +405,69 @@ body {
   gap: 12px;
 }
 
+.custom-node.active {
+  box-shadow: 0 0 20px rgba(var(--node-color-rgb), 0.4);
+  border-color: #fff;
+  animation: nodePulse 2s infinite alternate;
+}
+
+@keyframes nodePulse {
+  from {
+    box-shadow: 0 0 10px rgba(var(--node-color-rgb), 0.2);
+  }
+
+  to {
+    box-shadow: 0 0 25px rgba(var(--node-color-rgb), 0.5);
+  }
+}
+
+.custom-node.traffic_source.active .node-icon-wrapper {
+  animation: trafficFloat 3s ease-in-out infinite;
+}
+
+@keyframes trafficFloat {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-5px);
+    filter: drop-shadow(0 5px 15px rgba(244, 63, 94, 0.4));
+  }
+}
+
 .node-info {
   display: flex;
   flex-direction: column;
+  justify-content: center;
 }
 
 .node-name {
-  font-weight: 600;
-  font-size: 0.9rem;
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 2px;
 }
 
 .node-type {
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   color: var(--text-secondary);
   text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.7;
+  margin-bottom: 6px;
 }
 
-/* Evaluation Details */
-.eval-details {
+.node-stats {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 0.85rem;
+  color: #fbbf24;
+  /* Amber-400 for QPS values */
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
   border-top: 1px solid rgba(255, 255, 255, 0.1);
-  padding-top: 1.5rem;
+  padding-top: 4px;
 }
 
 .score-item {
