@@ -135,9 +135,29 @@ body {
   box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
 }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+.btn-primary.danger {
+  background: #f97316;
+  /* 橘紅色，醒目但不致於像刪除按鈕那麼強烈 */
+}
+
+.btn-primary.danger:hover:not(:disabled) {
+  background: #ea580c;
+  box-shadow: 0 4px 12px rgba(249, 115, 22, 0.4);
+}
+
+.btn-group {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 4px;
+  border-radius: 12px;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.btn-group .btn-primary {
+  padding: 0.4rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.85rem;
 }
 
 .game-main {

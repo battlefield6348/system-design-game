@@ -777,30 +777,32 @@ function Game() {
             <Target size={16} /> {selectedScenario?.title || '選擇場景'}
           </button>
 
-          {/* 自動排版按鈕 */}
-          <button
-            className="btn-primary"
-            onClick={() => onLayout('LR')}
-            title="自動排版 (Auto Layout)"
-          >
-            <Layout size={16} /> 自動排版
-          </button>
+          <div className="btn-group">
+            <button
+              className="btn-primary"
+              onClick={() => onLayout('LR')}
+              title="自動排版 (Auto Layout)"
+            >
+              <Layout size={16} /> 排版
+            </button>
 
-          <button
-            className={`btn-primary ${isAutoEvaluating ? 'active' : 'warning'}`}
-            onClick={() => setIsAutoEvaluating(!isAutoEvaluating)}
-            disabled={!isWasmLoaded}
-          >
-            <Play size={16} /> {isAutoEvaluating ? '暫停模擬' : '開啟模擬'}
-          </button>
+            <button
+              className={`btn-primary ${isAutoEvaluating ? 'active' : 'warning'}`}
+              onClick={() => setIsAutoEvaluating(!isAutoEvaluating)}
+              disabled={!isWasmLoaded}
+            >
+              <Play size={16} /> {isAutoEvaluating ? '暫停' : '開始'}
+            </button>
 
-          <button
-            className="btn-primary"
-            onClick={resetSimulation}
-            disabled={!isWasmLoaded}
-          >
-            <RotateCcw size={16} /> 重置流量
-          </button>
+            <button
+              className="btn-primary danger"
+              onClick={resetSimulation}
+              disabled={!isWasmLoaded}
+              title="重置所有流量與狀態"
+            >
+              <RotateCcw size={16} /> 重置
+            </button>
+          </div>
         </div>
       </header>
 
