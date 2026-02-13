@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -358,6 +358,29 @@ function Game() {
   const [gameTime, setGameTime] = useState(0);
   const [isAutoEvaluating, setIsAutoEvaluating] = useState(false);
   const [retentionRate, setRetentionRate] = useState(1.0);
+
+  const resetSimulation = () => {
+    setGameTime(0);
+    setIsAutoEvaluating(false);
+    setEvaluationResult(null);
+    setNodes((nds) => nds.map(node => ({
+      ...node,
+      data: {
+        ...node.data,
+        load: 0,
+        malicious_load: 0,
+        active: false,
+        crashed: false,
+        properties: {
+          ...node.data.properties,
+          backlog: 0,
+          crashed: false,
+          restartedAt: undefined,
+          replica_start_times: []
+        }
+      }
+    })));
+  };
 
   const deleteNode = useCallback((id) => {
     setNodes((nds) => nds.filter((node) => node.id !== id));
@@ -734,6 +757,14 @@ function Game() {
             disabled={!isWasmLoaded}
           >
             <Play size={16} /> {isAutoEvaluating ? '暫停模擬' : '開啟模擬'}
+          </button>
+
+          <button
+            className="btn-primary"
+            onClick={resetSimulation}
+            disabled={!isWasmLoaded}
+          >
+            <RotateCcw size={16} /> 重置流量
           </button>
         </div>
       </header>
