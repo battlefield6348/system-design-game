@@ -103,18 +103,6 @@ const CustomEdge = ({
               }}
             />
           )}
-
-          {/* 流動動畫效果 */}
-          <BaseEdge
-            path={edgePath}
-            style={{
-              stroke: 'rgba(255, 255, 255, 0.3)',
-              strokeWidth: 1,
-              strokeDasharray: '4, 4',
-              animation: 'dash 1.5s linear infinite',
-            }}
-            className="animated"
-          />
         </>
       ) : (
         /* 預設灰色線（無流量時） */
