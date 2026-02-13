@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -1435,11 +1435,24 @@ function Game() {
       {/* Goal Overlay */}
       {selectedScenario && (
         <div className="goal-overlay">
-          <div className="goal-title">當前挑戰: {selectedScenario.title}</div>
+          <div className="goal-title">當前任務: {selectedScenario.title}</div>
           <div className="goal-progress">
-            目標 QPS: {(selectedScenario.goal.min_qps / 1000).toFixed(0)}k |
-            最大延遲: {selectedScenario.goal.max_latency_ms}ms |
-            可用性 &gt; {selectedScenario.goal.availability}%
+            <div className="progress-item">
+              <span className="label">目標 QPS</span>
+              <span className={`status ${(evaluationResult?.fulfilled_qps || 0) >= selectedScenario.goal.min_qps ? 'success' : 'fail'}`}>
+                {(evaluationResult?.fulfilled_qps || 0)} / {selectedScenario.goal.min_qps}
+              </span>
+            </div>
+            <div className="progress-item">
+              <span className="label">延遲上限</span>
+              <span className={`status ${(evaluationResult?.avg_latency_ms || 0) <= selectedScenario.goal.max_latency_ms ? 'success' : 'fail'}`}>
+                {(evaluationResult?.avg_latency_ms || 0).toFixed(1)} / {selectedScenario.goal.max_latency_ms}ms
+              </span>
+            </div>
+            <div className="mission-timer">
+              <Clock size={16} />
+              <span>剩餘測試時間: {Math.max(0, selectedScenario.goal.duration - gameTime)}s</span>
+            </div>
           </div>
         </div>
       )}
