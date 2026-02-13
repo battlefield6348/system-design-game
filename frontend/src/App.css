@@ -262,13 +262,17 @@ body {
 }
 
 .tool-intro-card {
-  margin-top: 1.5rem;
   padding: 1rem;
-  background: rgba(99, 102, 241, 0.08);
-  border: 1px solid rgba(99, 102, 241, 0.2);
+  background: rgba(15, 23, 42, 0.9);
+  /* 加深背景確保文字清晰 */
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(99, 102, 241, 0.3);
   border-radius: 12px;
-  animation: fadeIn 0.3s ease-out;
+  animation: fadeIn 0.2s ease-out;
   border-left: 4px solid var(--accent-color);
+  width: 200px;
+  /* 固定寬度避免被壓縮 */
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
 }
 
 .tool-intro-card h4 {
