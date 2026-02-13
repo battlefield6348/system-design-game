@@ -75,9 +75,28 @@ func (r *InMemScenarioRepository) initMockData() {
 		},
 	}
 
+	s4 := &scenario.Scenario{
+		ID:          "sandbox",
+		Title:       "自由沙盒 (Sandbox Mode)",
+		Description: "無目標限制的無盡模式。流量會隨時間持續緩慢增長，適合用來測試任何瘋狂的架構想法。",
+		Goal: scenario.Goal{
+			MinQPS:        1,
+			MaxLatencyMS: 5000,
+			Availability: 0.5,
+			Duration:     3600,
+		},
+		Phases: []scenario.TrafficPhase{
+			{Name: "無限增長", StartQPS: 100, EndQPS: 100000, DurationSeconds: 3600},
+		},
+		Constraints: []scenario.Constraint{
+			{Type: "budget", Value: 999999}, // 近乎無限的預算
+		},
+	}
+
 	r.scenarios[s1.ID] = s1
 	r.scenarios[s2.ID] = s2
 	r.scenarios[s3.ID] = s3
+	r.scenarios[s4.ID] = s4
 }
 
 func (r *InMemScenarioRepository) GetByID(id string) (*scenario.Scenario, error) {
