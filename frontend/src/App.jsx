@@ -370,22 +370,25 @@ function Game() {
   });
 
   const [hoveredTool, setHoveredTool] = useState(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
 
   const toggleCategory = (cat) => {
     setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
   };
 
   const toolDescriptions = {
-    'WEB_SERVER': '基礎運算單元。處理業務邏輯，有 QPS 上限。',
-    'AUTO_SCALING_GROUP': '自動擴縮容叢集。能根據負載自動增減機器數量。',
-    'LOAD_BALANCER': '負載平衡器。分發流量至多個後端，避免單點過載。',
-    'CDN': '全球快取網路。緩存靜態資源，大幅降低延遲與 Origin 負載。',
-    'WAF': '網路防火牆。過濾惡意攻擊與異常流量，保護資安分數。',
-    'DATABASE': '關聯式資料庫。儲存核心數據，高負載下需做讀寫分離。',
-    'OBJECT_STORAGE': '物件儲存 (如 S3)。適合存放大量影音圖片，幾乎不崩潰。',
-    'SEARCH_ENGINE': '搜尋引擎 (如 ES)。提供高效全文檢索，適合熱搜功能。',
-    'CACHE': '分佈式快取 (如 Redis)。極低延遲，緩解 DB 壓力的神器。',
-    'MESSAGE_QUEUE': '訊息隊列 (如 Kafka)。異步通訊、消峰填谷，保證任務不丟失。'
+    'NANO_SERVER': '入門級節點 (200 QPS)。適合初期流量或輕量服務，部署成本極低。',
+    'STANDARD_SERVER': '標準運算節點 (1k QPS)。效能平衡點，適合大多數業務邏輯處理。',
+    'HIGH_PERF_SERVER': '最強效能節點 (5k QPS)。雖然昂貴，但在處理複雜計算與高併發時最為穩定。',
+    'AUTO_SCALING_GROUP': '自動擴縮容叢集。能根據 CPU 或負載自動增減機器數量，應對突發流量的首選。',
+    'LOAD_BALANCER': '流量分發器。確保後端伺服器負載均衡，避免單點故障。',
+    'CDN': '全球邊緣快取。緩存靜態資源與圖片，能擋掉 80% 以上的回源請求。',
+    'WAF': '網路防火牆。能識別並攔截惡意攻擊，提升系統安全性評分。',
+    'DATABASE': '關聯式資料庫 (PostgreSQL)。儲存結構化數據，高負載下需要考慮 Replication。',
+    'OBJECT_STORAGE': '雲端儲存 (S3)。專門存放影音、Log 等大型文件，具備極高的可用性。',
+    'SEARCH_ENGINE': '搜尋引擎 (ES)。解決資料庫在全文檢索下的效能瓶頸，熱搜必備。',
+    'CACHE': '極速快取 (Redis)。將熱點數據放進內容中，讓 API 延遲縮短至 1ms 以內。',
+    'MESSAGE_QUEUE': '異步訊息隊列 (Kafka)。讓系統組件解耦，具備削峰填谷能力。'
   };
 
   // 初始化取得關卡列表
@@ -1153,28 +1156,44 @@ function Game() {
                 {expandedCategories.compute && (
                   <div className="tool-list drawer-content">
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'Nano Server', type: 'WEB_SERVER' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'Nano Server', type: 'NANO_SERVER' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('WEB_SERVER', 'Nano Server', Server, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}
                     >
                       <Plus size={14} /> Nano Server
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: '標準伺服器', type: 'WEB_SERVER' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: '標準伺服器', type: 'STANDARD_SERVER' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, base_latency: 50, setup_cost: 200, operational_cost: 0.2 })}
                     >
                       <Plus size={14} /> 標準伺服器
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: '高效能伺服器', type: 'WEB_SERVER' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: '高效能伺服器', type: 'HIGH_PERF_SERVER' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Server, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}
                     >
                       <Plus size={14} /> 高效能伺服器
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'ASG 叢集', type: 'AUTO_SCALING_GROUP' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'ASG 叢集', type: 'AUTO_SCALING_GROUP' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10, operational_cost: 0.3 })}
                     >
@@ -1192,21 +1211,33 @@ function Game() {
                 {expandedCategories.networking && (
                   <div className="tool-list drawer-content">
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: '負載平衡器', type: 'LOAD_BALANCER' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: '負載平衡器', type: 'LOAD_BALANCER' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}
                     >
                       <Plus size={14} /> 負載平衡器
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'CDN 傳遞', type: 'CDN' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'CDN 傳遞', type: 'CDN' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('CDN', 'CDN (全球快取)', Globe, { max_qps: 50000 })}
                     >
                       <Plus size={14} /> CDN 傳遞
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'WAF 防火牆', type: 'WAF' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'WAF 防火牆', type: 'WAF' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}
                     >
@@ -1224,21 +1255,33 @@ function Game() {
                 {expandedCategories.storage && (
                   <div className="tool-list drawer-content">
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'SQL 資料庫', type: 'DATABASE' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'SQL 資料庫', type: 'DATABASE' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('DATABASE', '資料庫 (RDB)', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0, base_latency: 50, operational_cost: 0.5 })}
                     >
                       <Plus size={14} /> SQL 資料庫
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'S3 儲存', type: 'OBJECT_STORAGE' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'S3 儲存', type: 'OBJECT_STORAGE' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('OBJECT_STORAGE', '物件儲存 (S3)', HardDrive, { max_qps: 100000 })}
                     >
                       <Plus size={14} /> S3 儲存
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'ElasticSearch', type: 'SEARCH_ENGINE' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'ElasticSearch', type: 'SEARCH_ENGINE' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('SEARCH_ENGINE', '搜尋引擎 (ES)', Search, { max_qps: 2000 })}
                     >
@@ -1256,14 +1299,22 @@ function Game() {
                 {expandedCategories.middleware && (
                   <div className="tool-list drawer-content">
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'Redis 快取', type: 'CACHE' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'Redis 快取', type: 'CACHE' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 20000, base_latency: 1, operational_cost: 0.3 })}
                     >
                       <Plus size={14} /> Redis 快取
                     </button>
                     <button
-                      onMouseEnter={() => setHoveredTool({ name: 'Kafka 隊列', type: 'MESSAGE_QUEUE' })}
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: 'Kafka 隊列', type: 'MESSAGE_QUEUE' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
                       onMouseLeave={() => setHoveredTool(null)}
                       onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}
                     >
@@ -1274,7 +1325,16 @@ function Game() {
               </div>
 
               {hoveredTool && (
-                <div className="tool-intro-card">
+                <div
+                  className="tool-intro-card"
+                  style={{
+                    position: 'fixed',
+                    left: mousePos.x + 20,
+                    top: mousePos.y - 40,
+                    pointerEvents: 'none',
+                    zIndex: 9999
+                  }}
+                >
                   <h4>{hoveredTool.name}</h4>
                   <p>{toolDescriptions[hoveredTool.type]}</p>
                 </div>
