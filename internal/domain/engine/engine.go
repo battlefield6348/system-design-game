@@ -116,8 +116,16 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	// 生成惡意流量 (Malicious QPS) - 改為突發事件模型 (DDOS 攻擊)
 	isAttackActive := false
 	currentMaliciousQPS := int64(0)
+	
+	enableAttacks := false
+	for _, root := range roots {
+		if v, ok := compMap[root].Properties["enable_attacks"].(bool); ok {
+			enableAttacks = v
+		}
+	}
+
 	// 每 40 秒發動一次持續 5 秒的大型突發攻擊
-	if elapsedSeconds > 15 && elapsedSeconds%40 < 5 {
+	if enableAttacks && elapsedSeconds > 15 && elapsedSeconds%40 < 5 {
 		isAttackActive = true
 		// 攻擊流量強度：基礎 3000 QPS + 隨機波動
 		attackIntensity := 3000.0 + math.Abs(math.Sin(float64(elapsedSeconds)))*5000.0

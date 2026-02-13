@@ -613,7 +613,7 @@ function Game() {
           type: 'TRAFFIC_SOURCE',
           icon: Users,
           onDelete: deleteNode,
-          properties: { start_qps: 0, read_ratio: 80 }
+          properties: { start_qps: 0, read_ratio: 80, enable_attacks: true }
         },
         deletable: false,
       }
@@ -878,6 +878,24 @@ function Game() {
               }}
             />
             <span className="metric-unit">QPS</span>
+          </div>
+
+          <div className="metric-control checkbox">
+            <label style={{ display: 'flex', alignItems: 'center', gap: '4px', cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={nodes.find(n => n.data.type === 'TRAFFIC_SOURCE')?.data.properties?.enable_attacks || false}
+                onChange={(e) => {
+                  setNodes(nds => nds.map(n => {
+                    if (n.data.type === 'TRAFFIC_SOURCE') {
+                      return { ...n, data: { ...n.data, properties: { ...n.data.properties, enable_attacks: e.target.checked } } };
+                    }
+                    return n;
+                  }));
+                }}
+              />
+              受攻擊模擬
+            </label>
           </div>
 
           <div className="metric-control checkbox">
