@@ -231,6 +231,18 @@ const CustomNode = ({ data, selected, id }) => {
               <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`} style={{ borderTop: 'none', paddingTop: 0, marginTop: 2 }}>
                 總負載: {(data.load || 0).toFixed(0)} QPS
               </div>
+              {data.active && (
+                <div className="resource-bars">
+                  <div className="res-bar cpu">
+                    <div className="res-inner" style={{ width: `${Math.min(100, data.cpu_usage || 0)}%`, backgroundColor: (data.cpu_usage > 90 ? '#f43f5e' : '#f59e0b') }}></div>
+                    <span className="res-label">CPU {(data.cpu_usage || 0).toFixed(0)}%</span>
+                  </div>
+                  <div className="res-bar ram">
+                    <div className="res-inner" style={{ width: `${Math.min(100, data.ram_usage || 0)}%`, backgroundColor: (data.ram_usage > 90 ? '#f43f5e' : '#10b981') }}></div>
+                    <span className="res-label">RAM {(data.ram_usage || 0).toFixed(0)}%</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -275,6 +287,18 @@ const CustomNode = ({ data, selected, id }) => {
               {data.type === 'MESSAGE_QUEUE' && (
                 <div className={`node-stats ${data.properties?.backlog > 0 ? 'limited' : ''}`} style={{ borderTop: 'none', paddingTop: 0 }}>
                   積壓: {Math.max(0, data.properties?.backlog || 0).toFixed(0)} Msg
+                </div>
+              )}
+              {!isTraffic && data.active && (
+                <div className="resource-bars">
+                  <div className="res-bar cpu">
+                    <div className="res-inner" style={{ width: `${Math.min(100, data.cpu_usage || 0)}%`, backgroundColor: (data.cpu_usage > 90 ? '#f43f5e' : '#f59e0b') }}></div>
+                    <span className="res-label">CPU {(data.cpu_usage || 0).toFixed(0)}%</span>
+                  </div>
+                  <div className="res-bar ram">
+                    <div className="res-inner" style={{ width: `${Math.min(100, data.ram_usage || 0)}%`, backgroundColor: (data.ram_usage > 90 ? '#f43f5e' : '#10b981') }}></div>
+                    <span className="res-label">RAM {(data.ram_usage || 0).toFixed(0)}%</span>
+                  </div>
                 </div>
               )}
             </div>
@@ -764,6 +788,8 @@ function Game() {
             crashed: isCrashed || node.data.crashed,
             effectiveMaxQPS: effectiveMaxQPS,
             replicas: nodeReplicas,
+            cpu_usage: res.component_cpu_usage?.[node.id] || 0,
+            ram_usage: res.component_ram_usage?.[node.id] || 0,
             properties: updatedProperties,
             onDelete: deleteNode,
             onRestart: restartNode
@@ -778,6 +804,15 @@ function Game() {
           crashedSet.current.add(id);
           const comp = nodes.find(n => n.id === id);
           addLog(`[CRITICAL] 組件 ${comp?.data?.label || id} 已崩潰！QPS 超過負荷上限。`, 'error');
+        }
+      });
+      // 偵測 OOM (RAM 100%)
+      nodes.forEach(node => {
+        if (res.component_ram_usage?.[node.id] >= 100 && !crashedSet.current.has(`${node.id}-oom`)) {
+          crashedSet.current.add(`${node.id}-oom`);
+          addLog(`[CRITICAL] ${node.data.label} 發生 OOM (Out of Memory) 崩潰！`, 'error');
+        } else if (res.component_ram_usage?.[node.id] < 100) {
+          crashedSet.current.delete(`${node.id}-oom`);
         }
       });
       // 移除已重啟的崩潰紀錄

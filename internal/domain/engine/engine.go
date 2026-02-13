@@ -131,6 +131,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	compMaliciousLoads := make(map[string]int64)    // 紀錄組件收到的「惡意請求量」
 	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
 	compBacklogs := make(map[string]int64)          // 紀錄 MQ 等組件的積壓量
+	compCPUUsage := make(map[string]float64)       // 紀錄組件 CPU 使用率
+	compRAMUsage := make(map[string]float64)       // 紀錄組件 RAM 使用率
 
 	compReplicas := make(map[string]int)
 	for _, c := range d.Components {
@@ -349,6 +351,39 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			crashedNodes[id] = true
 			return // 崩潰，流量在此斷掉
 		}
+		
+		// --- 資源消耗計算 ---
+		// CPU 消耗：與負載成正比，100% 負荷代表達到 MaxQPS
+		cpu := 10.0 // 基礎 CPU 消耗 (Idle)
+		if currentMaxQPS > 0 {
+			cpu += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 90.0
+		}
+		compCPUUsage[id] = math.Min(150.0, cpu) // 最高顯示到 150% (代表嚴重過載)
+
+		// RAM 消耗：不同組件有不同特性
+		ram := 15.0 // 基礎 RAM 消耗
+		switch comp.Type {
+		case component.Cache:
+			// 快取組件：RAM 隨流量增長而填滿 (模擬快取物件增加)
+			ram += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 70.0
+		case component.MessageQueue:
+			// MQ 組件：RAM 隨積壓量 (Backlog) 增加
+			prevBacklog := int64(0)
+			if v, ok := comp.Properties["backlog"].(float64); ok { prevBacklog = int64(v) }
+			ram += (float64(prevBacklog) / 50000.0) * 80.0 // 假設 5萬筆積壓會爆 RAM
+		case component.Database, component.NoSQL:
+			ram += 30.0 + (float64(potentialTotalLoad) / 10000.0) * 20.0
+		default:
+			ram += (float64(potentialTotalLoad) / 20000.0) * 10.0
+		}
+		compRAMUsage[id] = math.Min(120.0, ram)
+
+		// OOM (Out of Memory) 判定
+		if !isGracePeriod && ram > 100.0 {
+			crashedNodes[id] = true
+			return // OOM 崩潰
+		}
+		// ------------------
 
 		visited[id] = true
 		compMaliciousLoads[id] += malInput
@@ -537,6 +572,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	// 延遲模擬
 	congestionFactor := 1.0
+	for _, cpuUsage := range compCPUUsage {
+		// CPU 過載導致的延遲：當 CPU > 90% 時發生指數級增長
+		if cpuUsage > 90.0 {
+			// (cpu - 90) / 10 的平方，讓過載後的延遲瞬間飆升
+			factor := 1.0 + math.Pow((cpuUsage-90.0)/10.0, 3.0)
+			if factor > congestionFactor {
+				congestionFactor = factor
+			}
+		}
+	}
+	
+	// 原有的排隊延遲邏輯 (基於 QPS/MaxQPS)
 	for id, load := range compLoads {
 		maxQPS := compEffectiveMaxQPS[id]
 		if maxQPS == 0 {
@@ -544,8 +591,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 		if maxQPS > 0 {
 			utilization := float64(load) / float64(maxQPS)
-			if utilization > 0.8 {
-				factor := 1.0 / math.Max(0.01, 1.1-utilization)
+			if utilization > 0.95 { // 接近極限時增加額外延遲
+				factor := 1.0 + (utilization-0.95)*10.0
 				if factor > congestionFactor {
 					congestionFactor = factor
 				}
@@ -621,6 +668,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentBacklogs:       compBacklogs,
 		SecurityScore:           securityScore,
 		ComponentMaliciousLoads: compMaliciousLoads,
+		ComponentCPUUsage:       compCPUUsage,
+		ComponentRAMUsage:       compRAMUsage,
 	}, nil
 }
 

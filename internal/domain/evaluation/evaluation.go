@@ -36,6 +36,8 @@ type Result struct {
 	ComponentBacklogs       map[string]int64 `json:"component_backlogs"`         // 每個組件當前的訊息積壓量 (MQ 適用)
 	SecurityScore           float64          `json:"security_score"`             // 安全評分 (0-100)
 	ComponentMaliciousLoads map[string]int64 `json:"component_malicious_loads"` // 每個組件承載的惡意 QPS
+	ComponentCPUUsage       map[string]float64 `json:"component_cpu_usage"`       // 每個組件的 CPU 使用率 (0-100)
+	ComponentRAMUsage       map[string]float64 `json:"component_ram_usage"`       // 每個組件的 RAM 使用率 (0-100)
 }
 
 // Engine 定義評估引擎的介面
