@@ -810,6 +810,19 @@ function Game() {
       if (res.avg_latency_ms < 5 && res.fulfilled_qps > 1000) {
         unlockAchievement("閃電俠", "在高負載下依然保持極低的系統延遲 (< 5ms)");
       }
+
+      // 4. 攻擊偵測紀錄
+      if (res.is_attack_active) {
+        if (!crashedSet.current.has('attack_log')) {
+          addLog(`[SECURITY] 偵測到大規模 DDOS 攻擊發動中！流量強度約 ${res.component_malicious_loads?.['traffic-1'] || '3k+'} QPS`, 'error');
+          crashedSet.current.add('attack_log');
+        }
+      } else {
+        if (crashedSet.current.has('attack_log')) {
+          addLog(`[SECURITY] 惡意流量攻擊已停止，系統恢復正常監測。`, 'success');
+          crashedSet.current.delete('attack_log');
+        }
+      }
     } catch (e) {
       console.error("解析評估結果失敗:", e);
     }
@@ -861,6 +874,10 @@ function Game() {
               <span className="metric" title="成功獲取資料的請求比例">成功率: {(evaluationResult.total_score || 0).toFixed(1)}%</span>
               <span className="metric">取得資料: {evaluationResult.fulfilled_qps} / {evaluationResult.total_qps} QPS</span>
             </div>
+          )}
+
+          {evaluationResult?.is_attack_active && (
+            <div className="attack-badge">UNDER ATTACK!</div>
           )}
 
           {evaluationResult?.is_burst_active && (

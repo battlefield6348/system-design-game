@@ -28,6 +28,7 @@ type Result struct {
 	ComponentLoads      map[string]int64 `json:"component_loads"`       // 每個組件具體承擔的 QPS
 	ComponentEffectiveMaxQPS map[string]int64 `json:"component_effective_max_qps"` // 每個組件當前有效最大 QPS
 	IsBurstActive           bool             `json:"is_burst_active"`            // 當前是否處於突發流量狀態
+	IsAttackActive          bool             `json:"is_attack_active"`           // 當前是否處於遭受惡意攻擊狀態
 	ComponentReplicas       map[string]int   `json:"component_replicas"`         // 每個組件當前的副本數
 	RetentionRate           float64          `json:"retention_rate"`             // 當前使用者留存率 (0.0 - 1.0)
 	IsRandomDrop            bool             `json:"is_random_drop"`             // 是否處於隨機驟降狀態

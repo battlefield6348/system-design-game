@@ -1066,6 +1066,19 @@ body {
   letter-spacing: 1px;
 }
 
+.attack-badge {
+  background: #7c3aed;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-weight: 800;
+  font-size: 0.75rem;
+  animation: blink 0.4s infinite alternate;
+  box-shadow: 0 0 15px rgba(124, 58, 237, 0.8);
+  letter-spacing: 1px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
 @keyframes blink {
   from {
     opacity: 1;

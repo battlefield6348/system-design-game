@@ -113,13 +113,16 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	// 最終實際流量
 	currentQPS = int64(float64(totalBaseQPS) * fluctuation * retentionRate)
 	
-	// 生成惡意流量 (Malicious QPS)
-	// 平時約 2% 髒流量，每 20 秒可能發生一次大型掃描 (高達 15%)
-	maliciousRatio := 0.02
-	if elapsedSeconds%20 < 4 {
-		maliciousRatio = 0.15
+	// 生成惡意流量 (Malicious QPS) - 改為突發事件模型 (DDOS 攻擊)
+	isAttackActive := false
+	currentMaliciousQPS := int64(0)
+	// 每 40 秒發動一次持續 5 秒的大型突發攻擊
+	if elapsedSeconds > 15 && elapsedSeconds%40 < 5 {
+		isAttackActive = true
+		// 攻擊流量強度：基礎 3000 QPS + 隨機波動
+		attackIntensity := 3000.0 + math.Abs(math.Sin(float64(elapsedSeconds)))*5000.0
+		currentMaliciousQPS = int64(attackIntensity)
 	}
-	currentMaliciousQPS := int64(float64(currentQPS) * maliciousRatio)
 
 	// 4. 核心物理流量模擬：計算負載與截斷
 	visited := make(map[string]bool)
@@ -609,6 +612,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentLoads:           compLoads,
 		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
 		IsBurstActive:           isBurstActive,
+		IsAttackActive:          isAttackActive,
 		ComponentReplicas:       compReplicas,
 		RetentionRate:           retentionRate,
 		IsRandomDrop:            isRandomDrop,
