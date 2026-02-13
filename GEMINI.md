@@ -12,16 +12,21 @@
 - `internal/infrastructure/`: 基礎設施實現（DB, External API, MQ）。
 - `internal/handler/`: 介面層（RESTful API, WebSocket）。
 
-## 核心領域模型 (Pre-alpha)
+## 核心領域模型 (Phase 1)
 
-- **Component (組件)**: 系統設計的最小單位（例如：Redis, PostgreSQL, Nginx）。
-- **Design (設計圖)**: 玩家排列組件後的完整拓撲結構。
-- **Scenario (情境/關卡)**: 遊戲給出的目標（例如：設計一個每秒 100k 請求的短網址系統）。
-- **Evaluation (評估結果)**: 針對設計的評分（可用性、成本、效能）。
+- **Component (組件)**: 系統設計的最小單位。
+  - **運算型**: Web Server, ASG (彈性伸縮組), Worker, **Video Transcoding (影片轉碼)**。
+  - **儲存型**: SQL (PostgreSQL), NoSQL (MongoDB), Redis, Object Storage。
+  - **流量型**: Load Balancer, API Gateway, CDN, WAF。
+- **Evaluation Engine (評估引擎)**:
+  - **流量模擬**: 支援 **讀取 (Read)** 與 **寫入 (Write)** 流量分離，並在視覺化連線上以雙線平行顯示。
+  - **資源負載**: CPU 與 RAM 消耗模型，上限 100%。RAM 超過 100% 會觸發 **OOM 崩潰**。
+  - **Auto Scaling**: ASG 支援基於 **CPU 或 RAM 使用率** 的擴展策略。
+  - **容量設計**: 組件 QPS 為固定容量（唯讀），玩家必須透過架構手段（如增加副本、LB 分流）解決瓶頸。
 
 ## 技術棧 (GitHub Pages 支援)
 
-- **Frontend**: Vite + React + TailwindCSS
+- **Frontend**: Vite + React + TailwindCSS + **XYFlow (React Flow)** 高階視覺化。
 - **Core Logic**: Golang (Go 1.25+)
 - **Delivery**: **WebAssembly (Wasm)** - 將 Go 後端邏輯編譯為 Wasm 運行於瀏覽器。
 - **Database**: LocalStorage / IndexedDB (替代 PostgreSQL)。
@@ -29,11 +34,11 @@
 
 ## 開發準則
 
-- 所有業務規範應定義在 `domain` 層。
+- 所有業務規範應定義在 `internal/domain` 層。
 - **溝通與註解**：全程使用 **繁體中文**。
 - **Git 規範**：Git Commit Message 必須使用 **繁體中文** 撰寫，保持風格統一。
 - 遵循 Go Module 標準。
-- **單人優先**：專注於設計評估邏輯 (Evaluation Engine)，確保其能準確反映系統設計品質。
+- **單人優先**：專注於設計評估邏輯 (Evaluation Engine)，確保其能準確反映系統設計品質（如影片轉碼的高 CPU 消耗）。
 
 ## 部署與開發 (GitHub Pages)
 
