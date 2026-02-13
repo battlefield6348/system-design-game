@@ -218,6 +218,18 @@ const CustomNode = ({ data, selected, id }) => {
                         <div className="server-qps-pill">{(currentFullfilledLoad || 0).toFixed(0)} QPS</div>
                       </div>
                       {isProvisioning && <div className="booting-spinner"></div>}
+                      {data.active && !isProvisioning && (
+                        <div className="server-resources">
+                          <div className="res-bar-mini cpu">
+                            <div className="res-inner" style={{ width: `${Math.min(100, data.cpu_usage || 0)}%`, backgroundColor: (data.cpu_usage > 90 ? '#f43f5e' : '#f59e0b') }}></div>
+                            <span className="res-label-mini">CPU {(data.cpu_usage || 0).toFixed(0)}%</span>
+                          </div>
+                          <div className="res-bar-mini ram">
+                            <div className="res-inner" style={{ width: `${Math.min(100, data.ram_usage || 0)}%`, backgroundColor: (data.ram_usage > 90 ? '#f43f5e' : '#10b981') }}></div>
+                            <span className="res-label-mini">RAM {(data.ram_usage || 0).toFixed(0)}%</span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -231,18 +243,6 @@ const CustomNode = ({ data, selected, id }) => {
               <div className={`node-stats ${isOverloaded ? 'overloaded' : ''}`} style={{ borderTop: 'none', paddingTop: 0, marginTop: 2 }}>
                 總負載: {(data.load || 0).toFixed(0)} QPS
               </div>
-              {data.active && (
-                <div className="resource-bars">
-                  <div className="res-bar cpu">
-                    <div className="res-inner" style={{ width: `${Math.min(100, data.cpu_usage || 0)}%`, backgroundColor: (data.cpu_usage > 90 ? '#f43f5e' : '#f59e0b') }}></div>
-                    <span className="res-label">CPU {(data.cpu_usage || 0).toFixed(0)}%</span>
-                  </div>
-                  <div className="res-bar ram">
-                    <div className="res-inner" style={{ width: `${Math.min(100, data.ram_usage || 0)}%`, backgroundColor: (data.ram_usage > 90 ? '#f43f5e' : '#10b981') }}></div>
-                    <span className="res-label">RAM {(data.ram_usage || 0).toFixed(0)}%</span>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         ) : (
