@@ -331,8 +331,32 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		
 		// Message Queue 特殊邏輯：消峰填谷 (Buffering)
 		if comp.Type == component.MessageQueue {
-			maxCap := currentMaxQPS
+			// 1. MQ 自身的 I/O 吞吐量限制
+			mqIoLimit := currentMaxQPS 
 			
+			// 2. 下游消費者的總處理能力 (Consumer-Driven)
+			downstreamCapacity := int64(0)
+			for _, nextID := range adj[id] {
+				if dsComp, ok := compMap[nextID]; ok {
+					// 如果下游已經掛了，則不提供處理能力
+					if crashedNodes[nextID] {
+						continue
+					}
+					// 這裡拿的是下游的基礎或有效容量
+					// 簡化模型：拿下游的 getCompMaxQPS (如果是 WebServer，通常是單機或 Cluster 的容量)
+					downstreamCapacity += getCompMaxQPS(dsComp)
+				}
+			}
+
+			// 實際處理速度受限於「MQ 吞吐量」與「消費者能力」的最小值
+			effectiveProcessingRate := mqIoLimit
+			if downstreamCapacity > 0 && downstreamCapacity < mqIoLimit {
+				effectiveProcessingRate = downstreamCapacity
+			} else if downstreamCapacity == 0 {
+				// 如果下游完全沒有可用的消費者，則處理能力為 0
+				effectiveProcessingRate = 0
+			}
+
 			// 從 Properties 獲取上一次的積壓量
 			prevBacklog := int64(0)
 			if v, ok := comp.Properties["backlog"].(float64); ok {
@@ -343,22 +367,23 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 			// 嘗試處理：當前輸入 + 歷史積壓
 			attemptLoad := input + prevBacklog
-			if maxCap > 0 && attemptLoad > maxCap {
-				// 超過處理能力，處理滿載，剩下的存入 backlog
-				actualProcessed = maxCap
-				compBacklogs[id] = attemptLoad - maxCap
+			if effectiveProcessingRate > 0 && attemptLoad > effectiveProcessingRate {
+				actualProcessed = effectiveProcessingRate
+				compBacklogs[id] = attemptLoad - effectiveProcessingRate
 			} else {
-				// 能力足夠，全部處理，清空 backlog
 				actualProcessed = attemptLoad
 				compBacklogs[id] = 0
 			}
 
-			// MQ 延遲代價：積壓越多延遲越高
+			// MQ 延遲代價
 			queuingDelay := 0.0
-			if maxCap > 0 {
-				queuingDelay = (float64(compBacklogs[id]) / float64(maxCap)) * 1000.0
+			if effectiveProcessingRate > 0 {
+				queuingDelay = (float64(compBacklogs[id]) / float64(effectiveProcessingRate)) * 1000.0
 			}
 			totalBaseLatency += queuingDelay
+			
+			// 更新顯示用的有效 MaxQPS
+			compEffectiveMaxQPS[id] = effectiveProcessingRate
 		} else {
 			if currentMaxQPS > 0 && potentialTotalLoad > currentMaxQPS {
 				factor := float64(currentMaxQPS) / float64(potentialTotalLoad)
