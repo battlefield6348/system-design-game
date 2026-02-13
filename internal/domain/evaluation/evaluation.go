@@ -40,6 +40,7 @@ type Result struct {
 	ComponentMaliciousLoads map[string]int64 `json:"component_malicious_loads"` // 每個組件承載的惡意 QPS
 	ComponentCPUUsage       map[string]float64 `json:"component_cpu_usage"`       // 每個組件的 CPU 使用率 (0-100)
 	ComponentRAMUsage       map[string]float64 `json:"component_ram_usage"`       // 每個組件的 RAM 使用率 (0-100)
+	Warnings                []string           `json:"warnings"`                  // 架構警告訊息（如：Slave 收到寫入流量）
 }
 
 // Engine 定義評估引擎的介面

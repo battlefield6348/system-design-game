@@ -835,6 +835,13 @@ function Game() {
           crashedSet.current.delete('attack_log');
         }
       }
+
+      // 5. 架構警告訊息
+      if (res.warnings && res.warnings.length > 0) {
+        res.warnings.forEach(warning => {
+          addLog(warning, 'warning');
+        });
+      }
     } catch (e) {
       console.error("解析評估結果失敗:", e);
     }

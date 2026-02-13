@@ -164,6 +164,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	var totalBaseLatency float64
 	var consistencyScore = 100.0
 	var securityIncidents float64 // 紀錄抵達敏感節點的惡意流量
+	var warnings []string          // 收集架構警告訊息
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
 	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
@@ -572,8 +573,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			if !isSlave {
 				fulfilledWrite = actualWrite
 			} else if actualWrite > 0 {
-				// 寫到 Slave 會延遲降分或觸發警告 (這裡簡單處理)
+				// 寫到 Slave 會降低一致性分數
 				consistencyScore -= 1.0
+				// 記錄警告訊息
+				warnings = append(warnings, fmt.Sprintf("[架構警告] Slave DB '%s' 收到 %d QPS 寫入流量！Slave 僅能處理讀取請求，請將寫入流量導向 Master。", comp.Name, actualWrite))
 			}
 		}
 		totalReadFulfilled += fulfilledRead
@@ -760,6 +763,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentMaliciousLoads: compMaliciousLoads,
 		ComponentCPUUsage:       compCPUUsage,
 		ComponentRAMUsage:       compRAMUsage,
+		Warnings:                warnings,
 	}, nil
 }
 
