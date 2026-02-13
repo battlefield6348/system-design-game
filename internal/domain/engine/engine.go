@@ -375,28 +375,56 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 		
 		// --- 資源消耗計算 ---
-		// CPU 消耗：與負載成正比，100% 負荷代表達到 MaxQPS
+		// CPU 消耗：與負載成正比，100% 負荷代表達到處理上限
 		cpu := 10.0 // 基礎 CPU 消耗 (Idle)
-		if currentMaxQPS > 0 {
+		// 如果是 ASG，計算的是「平均單機 CPU」，因為流量會被 LB 均分
+		if comp.Type == component.AutoScalingGroup && baseMaxQPS > 0 {
+			activeNodes := 1
+			if startTimes, ok := comp.Properties["replica_start_times"].([]interface{}); ok {
+				activeNodes = 1 + len(startTimes) // 假設所有 replica 都參與分擔 (或僅 active，此處暫採全部，因 booting 也佔資源)
+			}
+			// 平均單機負載
+			avgLoadPerNode := float64(potentialTotalLoad) / float64(activeNodes)
+			cpu += (avgLoadPerNode / float64(baseMaxQPS)) * 90.0
+		} else if currentMaxQPS > 0 {
 			cpu += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 90.0
 		}
 		compCPUUsage[id] = math.Min(150.0, cpu) // 最高顯示到 150% (代表嚴重過載)
 
 		// RAM 消耗：不同組件有不同特性
 		ram := 15.0 // 基礎 RAM 消耗
+		
+		// 為了計算準確，ASG 類型的 RAM 也是算單機平均
+		effectiveLoadForRAM := float64(potentialTotalLoad)
+		effectiveMaxForRAM := float64(currentMaxQPS)
+		if comp.Type == component.AutoScalingGroup && baseMaxQPS > 0 {
+			activeNodes := 1
+			if startTimes, ok := comp.Properties["replica_start_times"].([]interface{}); ok {
+				activeNodes = 1 + len(startTimes)
+			}
+			effectiveLoadForRAM = float64(potentialTotalLoad) / float64(activeNodes)
+			effectiveMaxForRAM = float64(baseMaxQPS)
+		}
+
 		switch comp.Type {
 		case component.Cache:
 			// 快取組件：RAM 隨流量增長而填滿 (模擬快取物件增加)
-			ram += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 70.0
+			if effectiveMaxForRAM > 0 {
+				ram += (effectiveLoadForRAM / effectiveMaxForRAM) * 70.0
+			}
 		case component.MessageQueue:
 			// MQ 組件：RAM 隨積壓量 (Backlog) 增加
 			prevBacklog := int64(0)
 			if v, ok := comp.Properties["backlog"].(float64); ok { prevBacklog = int64(v) }
 			ram += (float64(prevBacklog) / 50000.0) * 80.0 // 假設 5萬筆積壓會爆 RAM
 		case component.Database, component.NoSQL:
-			ram += 30.0 + (float64(potentialTotalLoad) / 10000.0) * 20.0
+			ram += 30.0 + (effectiveLoadForRAM / 10000.0) * 20.0
 		default:
-			ram += (float64(potentialTotalLoad) / 20000.0) * 10.0
+			if effectiveMaxForRAM > 0 {
+				ram += (effectiveLoadForRAM / 20000.0) * 10.0
+			} else {
+				ram += (effectiveLoadForRAM / 20000.0) * 10.0
+			}
 		}
 		compRAMUsage[id] = math.Min(120.0, ram)
 
