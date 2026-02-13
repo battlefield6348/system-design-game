@@ -398,8 +398,6 @@ function Game() {
 
   // 系統日誌與成就
   const [logs, setLogs] = useState([]);
-  const [achievements, setAchievements] = useState([]);
-  const unlockedSet = useRef(new Set());
   const crashedSet = useRef(new Set());
   const asgScaleRef = useRef({});
   const terminalEndRef = useRef(null);
@@ -408,19 +406,6 @@ function Game() {
     const time = new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
     setLogs(prev => [...prev.slice(-49), { time, msg, type }]);
   }, []);
-
-  const unlockAchievement = useCallback((title, description) => {
-    if (unlockedSet.current.has(title)) return;
-    unlockedSet.current.add(title);
-    const id = Date.now();
-    setAchievements(prev => [...prev, { id, title, description }]);
-    addLog(`成就達成！【${title}】`, 'success');
-
-    // 5秒後自動移除通知
-    setTimeout(() => {
-      setAchievements(prev => prev.filter(a => a.id !== id));
-    }, 5000);
-  }, [addLog]);
 
   // 自動捲動日誌
   useEffect(() => {
@@ -467,6 +452,7 @@ function Game() {
     setGameTime(0);
     setIsAutoEvaluating(false);
     setEvaluationResult(null);
+    setRetentionRate(1.0);
     setNodes((nds) => nds.map(node => ({
       ...node,
       data: {
@@ -835,16 +821,6 @@ function Game() {
         asgScaleRef.current[id] = replicas;
       });
 
-      // 3. 成就判定
-      if (res.total_score >= 100 && gameTime > 10) {
-        unlockAchievement("架構大師", "系統健康度與資料獲取率達到 100%");
-      }
-      if (res.fulfilled_qps >= 10000) {
-        unlockAchievement("萬人之敵", "成功處理超過 10k QPS 的流量");
-      }
-      if (res.avg_latency_ms < 5 && res.fulfilled_qps > 1000) {
-        unlockAchievement("閃電俠", "在高負載下依然保持極低的系統延遲 (< 5ms)");
-      }
 
       // 4. 攻擊偵測紀錄
       if (res.is_attack_active) {
@@ -1617,20 +1593,6 @@ function Game() {
         </section>
       </main>
 
-      {/* Achievement Toasts */}
-      <div className="achievement-container">
-        {achievements.map(achieve => (
-          <div key={achieve.id} className="achievement-toast">
-            <div className="achieve-icon">
-              <Award size={24} />
-            </div>
-            <div className="achieve-info">
-              <h5>成就達成！</h5>
-              <p><strong>{achieve.title}:</strong> {achieve.description}</p>
-            </div>
-          </div>
-        ))}
-      </div>
 
       {/* Scenario Selection Modal */}
       {showScenarioModal && (
