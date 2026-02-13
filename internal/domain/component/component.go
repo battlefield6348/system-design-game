@@ -18,6 +18,7 @@ const (
 	APIGateway        Type = "API_GATEWAY"
 	NoSQL             Type = "NOSQL"
 	Worker            Type = "WORKER"
+	VideoTranscoding  Type = "VIDEO_TRANSCODING"
 )
 
 // Component 代表系統中的一個最小單位

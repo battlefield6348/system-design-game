@@ -17,7 +17,7 @@ import {
   useNodes,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock, Terminal, Award, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight, Users, Zap, ShieldCheck, Waves, Cpu, Clock, Terminal, Award, AlertTriangle, CheckCircle2, Film } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -1553,6 +1553,17 @@ function Game() {
                       onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', Waves, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}
                     >
                       <Plus size={14} /> Kafka 隊列
+                    </button>
+                    <button
+                      onMouseEnter={(e) => {
+                        setHoveredTool({ name: '影片轉碼', type: 'VIDEO_TRANSCODING' });
+                        setMousePos({ x: e.clientX, y: e.clientY });
+                      }}
+                      onMouseMove={(e) => setMousePos({ x: e.clientX, y: e.clientY })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('VIDEO_TRANSCODING', '影片轉碼服務', Film, { max_qps: 100, base_latency: 5000, setup_cost: 1000, operational_cost: 1.5 })}
+                    >
+                      <Plus size={14} /> 影片轉碼
                     </button>
                   </div>
                 )}

@@ -456,6 +456,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			if effectiveMaxForRAM > 0 {
 				ram += 20.0 + (effectiveLoadForRAM / effectiveMaxForRAM) * 40.0
 			}
+		case component.VideoTranscoding:
+			// 影片轉碼：極高 CPU 和中等 RAM 消耗
+			// CPU: 轉碼是 CPU 密集型任務
+			cpu += 40.0 // 基礎 CPU 消耗就很高
+			if currentMaxQPS > 0 {
+				cpu += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 50.0
+			}
+			// RAM: 需要載入影片到記憶體
+			if effectiveMaxForRAM > 0 {
+				ram += 30.0 + (effectiveLoadForRAM / effectiveMaxForRAM) * 40.0
+			}
 		case component.Database, component.NoSQL:
 			ram += 30.0 + (effectiveLoadForRAM / 10000.0) * 20.0
 		default:
