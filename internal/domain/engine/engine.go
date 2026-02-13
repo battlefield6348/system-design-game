@@ -423,7 +423,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		} else if currentMaxQPS > 0 {
 			cpu += (float64(potentialTotalLoad) / float64(currentMaxQPS)) * 90.0
 		}
-		compCPUUsage[id] = math.Min(150.0, cpu) // 最高顯示到 150% (代表嚴重過載)
+		compCPUUsage[id] = math.Min(100.0, cpu) // CPU 使用率最高 100%
 
 		// RAM 消耗：不同組件有不同特性
 		ram := 15.0 // 基礎 RAM 消耗
@@ -465,7 +465,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				ram += (effectiveLoadForRAM / 20000.0) * 10.0
 			}
 		}
-		compRAMUsage[id] = math.Min(120.0, ram)
+		compRAMUsage[id] = math.Min(100.0, ram) // RAM 使用率最高 100%
 
 		// OOM (Out of Memory) 判定
 		if !isGracePeriod && ram > 100.0 {
@@ -494,7 +494,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		
 		// 重新計算 CPU (考慮寫入加權)
 		if currentMaxQPS > 0 {
-			compCPUUsage[id] = math.Min(150.0, 10.0+(effectiveResourceLoad/float64(currentMaxQPS))*90.0)
+			compCPUUsage[id] = math.Min(100.0, 10.0+(effectiveResourceLoad/float64(currentMaxQPS))*90.0)
 		}
 
 		// 安全判定
