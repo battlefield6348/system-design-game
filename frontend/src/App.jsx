@@ -47,12 +47,16 @@ const CustomEdge = ({
     targetPosition,
   });
 
-  // 計算讀寫比例
+  // 計算讀寫流量
   const readLoad = targetNode?.data?.read_load || 0;
   const writeLoad = targetNode?.data?.write_load || 0;
   const totalLoad = readLoad + writeLoad;
-  const readRatio = totalLoad > 0 ? readLoad / totalLoad : 0.5;
-  const writeRatio = totalLoad > 0 ? writeLoad / totalLoad : 0.5;
+
+  // 計算線條粗細（基於流量大小）
+  const maxWidth = 4;
+  const minWidth = 1;
+  const readWidth = totalLoad > 0 ? minWidth + (readLoad / totalLoad) * (maxWidth - minWidth) : 2;
+  const writeWidth = totalLoad > 0 ? minWidth + (writeLoad / totalLoad) * (maxWidth - minWidth) : 2;
 
   return (
     <g
@@ -70,52 +74,54 @@ const CustomEdge = ({
         style={{ cursor: 'pointer', pointerEvents: 'all' }}
       />
 
-      {/* 底層：讀取流量（藍色） */}
-      {totalLoad > 0 && readLoad > 0 && (
-        <BaseEdge
-          path={edgePath}
-          markerEnd={markerEnd}
-          style={{
-            stroke: '#60a5fa',
-            strokeWidth: Math.max(2, 8 * readRatio),
-            opacity: 0.8,
-          }}
-        />
-      )}
+      {totalLoad > 0 ? (
+        <>
+          {/* 上方：讀取流量（藍色線） */}
+          {readLoad > 0 && (
+            <BaseEdge
+              path={edgePath}
+              markerEnd={markerEnd}
+              style={{
+                stroke: '#60a5fa',
+                strokeWidth: readWidth,
+                transform: 'translateY(-3px)',
+                opacity: 0.9,
+              }}
+            />
+          )}
 
-      {/* 頂層：寫入流量（橘色） */}
-      {totalLoad > 0 && writeLoad > 0 && (
-        <BaseEdge
-          path={edgePath}
-          style={{
-            stroke: '#fb923c',
-            strokeWidth: Math.max(2, 8 * writeRatio),
-            opacity: 0.8,
-            strokeDasharray: '8, 4',
-          }}
-        />
-      )}
+          {/* 下方：寫入流量（橘色線） */}
+          {writeLoad > 0 && (
+            <BaseEdge
+              path={edgePath}
+              style={{
+                stroke: '#fb923c',
+                strokeWidth: writeWidth,
+                transform: 'translateY(3px)',
+                opacity: 0.9,
+                strokeDasharray: '6, 3',
+              }}
+            />
+          )}
 
-      {/* 預設灰色線（無流量時） */}
-      {totalLoad === 0 && (
+          {/* 流動動畫效果 */}
+          <BaseEdge
+            path={edgePath}
+            style={{
+              stroke: 'rgba(255, 255, 255, 0.3)',
+              strokeWidth: 1,
+              strokeDasharray: '4, 4',
+              animation: 'dash 1.5s linear infinite',
+            }}
+            className="animated"
+          />
+        </>
+      ) : (
+        /* 預設灰色線（無流量時） */
         <BaseEdge
           path={edgePath}
           markerEnd={markerEnd}
           style={{ stroke: isHovered ? '#818cf8' : '#334155', strokeWidth: isHovered ? 4 : 2 }}
-        />
-      )}
-
-      {/* 流動動畫效果 */}
-      {totalLoad > 0 && (
-        <BaseEdge
-          path={edgePath}
-          style={{
-            stroke: 'rgba(255, 255, 255, 0.3)',
-            strokeWidth: 2,
-            strokeDasharray: '5, 10',
-            animation: 'dash 1s linear infinite',
-          }}
-          className="animated"
         />
       )}
       <EdgeLabelRenderer>
