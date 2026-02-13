@@ -541,13 +541,22 @@ function Game() {
       return;
     }
 
+    // 限制流量來源只能有一條連出線路
+    if (sourceNode?.data.type === 'TRAFFIC_SOURCE') {
+      const existingEdges = edges.filter(e => e.source === params.source);
+      if (existingEdges.length >= 1) {
+        alert('架構規範：流量來源 (Traffic Source) 只能連向一個進入點。如需分流，請接上 Load Balancer！');
+        return;
+      }
+    }
+
     const newEdge = {
       ...params,
       type: 'custom',
       data: { onDelete: deleteEdge }
     };
     setEdges((eds) => addEdge(newEdge, eds));
-  }, [setEdges, deleteEdge, nodes]);
+  }, [setEdges, deleteEdge, nodes, edges]);
 
   const addComponent = (type, label, icon, properties = {}) => {
     const id = `${type.toLowerCase()}-${Date.now()}`;
@@ -886,8 +895,8 @@ function Game() {
                       </>
                     )}
 
-                    {/* Auto Scaling Logic for Web Server and ASG */}
-                    {(selectedNode.data.type === 'WEB_SERVER' || selectedNode.data.type === 'AUTO_SCALING_GROUP') && (
+                    {/* Auto Scaling Logic ONLY for ASG */}
+                    {selectedNode.data.type === 'AUTO_SCALING_GROUP' && (
                       <>
                         <div className="prop-group checkbox">
                           <label>
