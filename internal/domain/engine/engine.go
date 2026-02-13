@@ -7,7 +7,6 @@ import (
 	"system-design-game/internal/domain/design"
 	"system-design-game/internal/domain/evaluation"
 	"system-design-game/internal/domain/scenario"
-	"time"
 )
 
 // SimpleEngine 是一個基礎的評估引擎實作
@@ -439,7 +438,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		Passed:              totalScore >= 95.0,
 		AvgLatencyMS:        avgLatency,
 		TotalQPS:            currentQPS,
-		CreatedAt:           time.Now().Unix(),
+		CreatedAt:           elapsedSeconds,
 		ActiveComponentIDs:  activeIDs,
 		CrashedComponentIDs: crashedIDs,
 		ComponentLoads:           compLoads,
