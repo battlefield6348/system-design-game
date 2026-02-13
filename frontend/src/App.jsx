@@ -274,10 +274,22 @@ const CustomNode = ({ data, selected, id }) => {
               <div className="node-name">{data.label}</div>
               <div className="node-type">{data.type}</div>
               {data.load !== undefined && (
-                <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
-                  {isCrashed ? '0' : (data.load || 0).toFixed(0)}
-                  {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
-                </div>
+                <>
+                  <div className={`node-stats ${isSourceLimited && isTraffic ? 'limited' : ''} ${isOverloaded ? 'overloaded' : ''}`}>
+                    {isCrashed ? '0' : (data.load || 0).toFixed(0)}
+                    {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
+                  </div>
+                  {data.active && data.read_load !== undefined && data.write_load !== undefined && (data.read_load > 0 || data.write_load > 0) && (
+                    <div className="rw-breakdown">
+                      <span className="rw-item read" title="讀取流量">
+                        📖 {data.read_load.toFixed(0)}
+                      </span>
+                      <span className="rw-item write" title="寫入流量">
+                        ✍️ {data.write_load.toFixed(0)}
+                      </span>
+                    </div>
+                  )}
+                </>
               )}
               {data.malicious_load > 0 && (
                 <div className="node-stats" style={{ borderTop: 'none', paddingTop: 0, color: '#ef4444', fontWeight: 'bold' }}>
@@ -768,6 +780,8 @@ function Game() {
           data: {
             ...node.data,
             load: isActiveNode ? nodeLoad : 0,
+            read_load: res.component_read_loads?.[node.id] || 0,
+            write_load: res.component_write_loads?.[node.id] || 0,
             malicious_load: res.component_malicious_loads?.[node.id] || 0,
             active: isActiveNode,
             active_time: res.created_at, // 用於判斷暖機進度

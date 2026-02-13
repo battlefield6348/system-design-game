@@ -136,6 +136,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	visited := make(map[string]bool)
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
+	compReadLoads := make(map[string]int64)         // 紀錄組件收到的「讀取流量」
+	compWriteLoads := make(map[string]int64)        // 紀錄組件收到的「寫入流量」
 	compMaliciousLoads := make(map[string]int64)    // 紀錄組件收到的「惡意請求量」
 	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
 	compBacklogs := make(map[string]int64)          // 紀錄 MQ 等組件的積壓量
@@ -291,6 +293,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		// 因為崩潰是看「嘗試打進來的量」，而不是「成功擠進來的量」
 		potentialTotalLoad := passesInputLoad[id]
 		compLoads[id] = potentialTotalLoad // 前端顯示的是「嘗試請求量」
+		compReadLoads[id] = read           // 記錄讀取流量
+		compWriteLoads[id] = write         // 記錄寫入流量
 
 		// Auto Scaling Logic (Shared by WebServer and AutoScalingGroup)
 		if comp.Type == component.WebServer || comp.Type == component.AutoScalingGroup {
@@ -763,6 +767,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		ComponentMaliciousLoads: compMaliciousLoads,
 		ComponentCPUUsage:       compCPUUsage,
 		ComponentRAMUsage:       compRAMUsage,
+		ComponentReadLoads:      compReadLoads,
+		ComponentWriteLoads:     compWriteLoads,
 		Warnings:                warnings,
 	}, nil
 }
