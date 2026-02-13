@@ -32,8 +32,11 @@ const CustomEdge = ({
   style = {},
   markerEnd,
   data,
+  target,
 }) => {
   const [isHovered, setIsHovered] = useState(false);
+  const nodes = useNodes(); // 動態獲取所有節點
+  const targetNode = nodes.find(n => n.id === target); // 查找目標節點
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
@@ -88,9 +91,31 @@ const CustomEdge = ({
             scale: isHovered ? 1 : 0.5,
             transition: 'all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
             zIndex: 1000,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '4px'
           }}
           className="nodrag nopan"
         >
+          {targetNode?.data?.read_load !== undefined && targetNode?.data?.write_load !== undefined &&
+            (targetNode.data.read_load > 0 || targetNode.data.write_load > 0) && (
+              <div style={{
+                background: 'rgba(15, 23, 42, 0.95)',
+                backdropFilter: 'blur(8px)',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                display: 'flex',
+                gap: '8px',
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3)'
+              }}>
+                <span style={{ color: '#60a5fa' }}>📖 {targetNode.data.read_load.toFixed(0)}</span>
+                <span style={{ color: '#fb923c' }}>✍️ {targetNode.data.write_load.toFixed(0)}</span>
+              </div>
+            )}
           <button className="edge-delete-btn" onClick={() => data.onDelete(id)}>
             <X size={12} strokeWidth={4} />
           </button>
