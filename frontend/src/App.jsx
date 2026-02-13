@@ -16,7 +16,7 @@ import {
   ReactFlowProvider,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy } from 'lucide-react';
+import { Server, Activity, Database, Share2, Plus, Play, X, List, Globe, Shield, HardDrive, Search, Layout, Copy, RotateCcw, Target, Trophy, ChevronDown, ChevronRight } from 'lucide-react';
 import dagre from 'dagre';
 import './App.css';
 
@@ -361,6 +361,32 @@ function Game() {
   const [scenarios, setScenarios] = useState([]);
   const [selectedScenario, setSelectedScenario] = useState(null);
   const [showScenarioModal, setShowScenarioModal] = useState(false);
+
+  const [expandedCategories, setExpandedCategories] = useState({
+    compute: true,
+    networking: true,
+    storage: false,
+    middleware: false
+  });
+
+  const [hoveredTool, setHoveredTool] = useState(null);
+
+  const toggleCategory = (cat) => {
+    setExpandedCategories(prev => ({ ...prev, [cat]: !prev[cat] }));
+  };
+
+  const toolDescriptions = {
+    'WEB_SERVER': '基礎運算單元。處理業務邏輯，有 QPS 上限。',
+    'AUTO_SCALING_GROUP': '自動擴縮容叢集。能根據負載自動增減機器數量。',
+    'LOAD_BALANCER': '負載平衡器。分發流量至多個後端，避免單點過載。',
+    'CDN': '全球快取網路。緩存靜態資源，大幅降低延遲與 Origin 負載。',
+    'WAF': '網路防火牆。過濾惡意攻擊與異常流量，保護資安分數。',
+    'DATABASE': '關聯式資料庫。儲存核心數據，高負載下需做讀寫分離。',
+    'OBJECT_STORAGE': '物件儲存 (如 S3)。適合存放大量影音圖片，幾乎不崩潰。',
+    'SEARCH_ENGINE': '搜尋引擎 (如 ES)。提供高效全文檢索，適合熱搜功能。',
+    'CACHE': '分佈式快取 (如 Redis)。極低延遲，緩解 DB 壓力的神器。',
+    'MESSAGE_QUEUE': '訊息隊列 (如 Kafka)。異步通訊、消峰填谷，保證任務不丟失。'
+  };
 
   // 初始化取得關卡列表
   useEffect(() => {
@@ -1118,67 +1144,142 @@ function Game() {
               })()}
             </div>
           ) : (
-            <>
-              <div className="tool-category">
-                <h3>Compute 運算節點</h3>
-                <div className="tool-list">
-                  <button onClick={() => addComponent('WEB_SERVER', 'Nano Server', Server, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}>
-                    <Plus size={14} /> Nano Server
-                  </button>
-                  <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, base_latency: 50, setup_cost: 200, operational_cost: 0.2 })}>
-                    <Plus size={14} /> 標準伺服器
-                  </button>
-                  <button onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Server, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}>
-                    <Plus size={14} /> 高效能伺服器
-                  </button>
-                  <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10, operational_cost: 0.3 })}>
-                    <Plus size={14} /> ASG 叢集
-                  </button>
+            <div className="tool-accordion">
+              <div className={`tool-category ${expandedCategories.compute ? 'expanded' : ''}`}>
+                <div className="category-header" onClick={() => toggleCategory('compute')}>
+                  <h3>Compute 運算節點</h3>
+                  {expandedCategories.compute ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
+                {expandedCategories.compute && (
+                  <div className="tool-list drawer-content">
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'Nano Server', type: 'WEB_SERVER' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('WEB_SERVER', 'Nano Server', Server, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}
+                    >
+                      <Plus size={14} /> Nano Server
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: '標準伺服器', type: 'WEB_SERVER' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, base_latency: 50, setup_cost: 200, operational_cost: 0.2 })}
+                    >
+                      <Plus size={14} /> 標準伺服器
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: '高效能伺服器', type: 'WEB_SERVER' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Server, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}
+                    >
+                      <Plus size={14} /> 高效能伺服器
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'ASG 叢集', type: 'AUTO_SCALING_GROUP' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10, operational_cost: 0.3 })}
+                    >
+                      <Plus size={14} /> ASG 叢集
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="tool-category">
-                <h3>Networking 網路設施</h3>
-                <div className="tool-list">
-                  <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}>
-                    <Plus size={14} /> 負載平衡器
-                  </button>
-                  <button onClick={() => addComponent('CDN', 'CDN (全球快取)', Globe, { max_qps: 50000 })}>
-                    <Plus size={14} /> CDN 傳遞
-                  </button>
-                  <button onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}>
-                    <Plus size={14} /> WAF 防火牆
-                  </button>
+              <div className={`tool-category ${expandedCategories.networking ? 'expanded' : ''}`}>
+                <div className="category-header" onClick={() => toggleCategory('networking')}>
+                  <h3>Networking 網路設施</h3>
+                  {expandedCategories.networking ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
+                {expandedCategories.networking && (
+                  <div className="tool-list drawer-content">
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: '負載平衡器', type: 'LOAD_BALANCER' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}
+                    >
+                      <Plus size={14} /> 負載平衡器
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'CDN 傳遞', type: 'CDN' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('CDN', 'CDN (全球快取)', Globe, { max_qps: 50000 })}
+                    >
+                      <Plus size={14} /> CDN 傳遞
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'WAF 防火牆', type: 'WAF' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}
+                    >
+                      <Plus size={14} /> WAF 防火牆
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="tool-category">
-                <h3>Storage 資料儲存</h3>
-                <div className="tool-list">
-                  <button onClick={() => addComponent('DATABASE', '資料庫 (RDB)', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0, base_latency: 50, operational_cost: 0.5 })}>
-                    <Plus size={14} /> SQL 資料庫
-                  </button>
-                  <button onClick={() => addComponent('OBJECT_STORAGE', '物件儲存 (S3)', HardDrive, { max_qps: 100000 })}>
-                    <Plus size={14} /> S3 儲存
-                  </button>
-                  <button onClick={() => addComponent('SEARCH_ENGINE', '搜尋引擎 (ES)', Search, { max_qps: 2000 })}>
-                    <Plus size={14} /> ElasticSearch
-                  </button>
+              <div className={`tool-category ${expandedCategories.storage ? 'expanded' : ''}`}>
+                <div className="category-header" onClick={() => toggleCategory('storage')}>
+                  <h3>Storage 資料儲存</h3>
+                  {expandedCategories.storage ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
+                {expandedCategories.storage && (
+                  <div className="tool-list drawer-content">
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'SQL 資料庫', type: 'DATABASE' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('DATABASE', '資料庫 (RDB)', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0, base_latency: 50, operational_cost: 0.5 })}
+                    >
+                      <Plus size={14} /> SQL 資料庫
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'S3 儲存', type: 'OBJECT_STORAGE' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('OBJECT_STORAGE', '物件儲存 (S3)', HardDrive, { max_qps: 100000 })}
+                    >
+                      <Plus size={14} /> S3 儲存
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'ElasticSearch', type: 'SEARCH_ENGINE' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('SEARCH_ENGINE', '搜尋引擎 (ES)', Search, { max_qps: 2000 })}
+                    >
+                      <Plus size={14} /> ElasticSearch
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="tool-category">
-                <h3>Middleware 中介軟體</h3>
-                <div className="tool-list">
-                  <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 20000, base_latency: 1, operational_cost: 0.3 })}>
-                    <Plus size={14} /> Redis 快取
-                  </button>
-                  <button onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}>
-                    <Plus size={14} /> Kafka 隊列
-                  </button>
+              <div className={`tool-category ${expandedCategories.middleware ? 'expanded' : ''}`}>
+                <div className="category-header" onClick={() => toggleCategory('middleware')}>
+                  <h3>Middleware 中介軟體</h3>
+                  {expandedCategories.middleware ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                 </div>
+                {expandedCategories.middleware && (
+                  <div className="tool-list drawer-content">
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'Redis 快取', type: 'CACHE' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 20000, base_latency: 1, operational_cost: 0.3 })}
+                    >
+                      <Plus size={14} /> Redis 快取
+                    </button>
+                    <button
+                      onMouseEnter={() => setHoveredTool({ name: 'Kafka 隊列', type: 'MESSAGE_QUEUE' })}
+                      onMouseLeave={() => setHoveredTool(null)}
+                      onClick={() => addComponent('MESSAGE_QUEUE', '訊息佇列 (Kafka)', List, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}
+                    >
+                      <Plus size={14} /> Kafka 隊列
+                    </button>
+                  </div>
+                )}
               </div>
-            </>
+
+              {hoveredTool && (
+                <div className="tool-intro-card">
+                  <h4>{hoveredTool.name}</h4>
+                  <p>{toolDescriptions[hoveredTool.type]}</p>
+                </div>
+              )}
+            </div>
           )}
 
           {evaluationResult && (
