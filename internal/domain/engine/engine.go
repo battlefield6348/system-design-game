@@ -125,6 +125,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	var totalFulfilledQPS int64
+	var totalOperationalCost float64
+	var totalBaseLatency float64
+	var consistencyScore = 100.0
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
 	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
@@ -200,6 +203,32 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		baseMaxQPS := getCompMaxQPS(comp)
 		currentMaxQPS := baseMaxQPS
 
+		// 基礎開課成本 (Setup + Operational)
+		totalOperationalCost += comp.OperationalCost
+
+		// 基礎延遲累積
+		if v, ok := comp.Properties["base_latency"].(float64); ok {
+			totalBaseLatency += v
+		} else if v, ok := comp.Properties["base_latency"].(int64); ok {
+			totalBaseLatency += float64(v)
+		} else {
+			// 預設延遲
+			switch comp.Type {
+			case component.LoadBalancer:
+				totalBaseLatency += 5.0
+			case component.WebServer:
+				totalBaseLatency += 20.0
+			case component.Database:
+				totalBaseLatency += 50.0
+			case component.MessageQueue:
+				totalBaseLatency += 200.0 // MQ 的非同步延遲代價
+				consistencyScore -= 5.0    // MQ 引入最終一致性風險
+			case component.Cache, component.CDN:
+				totalBaseLatency += 2.0
+				consistencyScore -= 10.0 // Cache 引入資料不一致風險
+			}
+		}
+
 		// 這裡使用 Pass 1 計算出的 "潛在總流量" 來判斷是否崩潰
 		// 因為崩潰是看「嘗試打進來的量」，而不是「成功擠進來的量」
 		potentialTotalLoad := passesInputLoad[id]
@@ -253,6 +282,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 				currentMaxQPS = baseMaxQPS * int64(activeCount)
 				compReplicas[id] = activeCount + bootingCount
+				// ASG 額外成本：每台機器都要算錢
+				totalOperationalCost += comp.OperationalCost * float64(activeCount+bootingCount-1)
 			} else {
 				compReplicas[id] = 1
 			}
@@ -403,10 +434,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 	}
-	avgLatency := 50.0 * congestionFactor
-	if avgLatency > 2000 {
-		avgLatency = 2000
+	avgLatency := totalBaseLatency * congestionFactor
+	if avgLatency > 5000 {
+		avgLatency = 5000
 	}
+
+	// 成本評估：如果超過預算可能需要扣分 (假設基礎預算 100/sec)
+	costScore := 100.0
+	if totalOperationalCost > 50.0 {
+		costScore = math.Max(0, 100.0-(totalOperationalCost-50.0)*2)
+	}
+
+	if consistencyScore < 0 { consistencyScore = 0 }
 
 	comment := "系統穩定運行中。"
 	if successRate < 0.1 {
@@ -417,8 +456,10 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	scores := []evaluation.Score{
 		{Dimension: "System Health", Value: totalScore, Comment: comment},
-		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-50)/10), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
+		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-100)/20), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
 		{Dimension: "Reliability", Value: reliabilityScore, Comment: "基於冗餘設計與崩潰頻率的可靠性評分。"},
+		{Dimension: "Cost Efficiency", Value: costScore, Comment: fmt.Sprintf("每秒運維成本: $%.2f", totalOperationalCost)},
+		{Dimension: "Data Consistency", Value: consistencyScore, Comment: "快取或異步隊列會降低即時一致性。"},
 	}
 
 	activeIDs := make([]string, 0, len(visited))
@@ -448,6 +489,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		RetentionRate:           retentionRate,
 		IsRandomDrop:            isRandomDrop,
 		FulfilledQPS:            totalFulfilledQPS,
+		CostPerSec:              totalOperationalCost,
 	}, nil
 }
 

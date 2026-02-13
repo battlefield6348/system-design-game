@@ -522,7 +522,12 @@ function Game() {
       id,
       type: 'custom',
       position: { x: 300, y: 150 },
-      data: { label, type, icon, properties, onDelete: deleteNode },
+      data: {
+        label, type, icon, properties,
+        setup_cost: properties.setup_cost || 0,
+        operational_cost: properties.operational_cost || 0,
+        onDelete: deleteNode
+      },
     };
     setNodes((nds) => nds.concat(newNode));
   };
@@ -538,6 +543,8 @@ function Game() {
         id: n.id,
         name: n.data.label,
         type: n.data.type,
+        setup_cost: n.data.setup_cost || 0,
+        operational_cost: n.data.operational_cost || 0,
         properties: n.data.properties || { max_qps: 1000 }
       })),
       connections: edges.map(e => ({
@@ -1030,13 +1037,19 @@ function Game() {
             <>
               <h3>基礎設施工具</h3>
               <div className="tool-list">
-                <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, auto_scaling: false, max_replicas: 5 })}>
-                  <Plus size={14} /> 伺服器 (1k QPS)
+                <button onClick={() => addComponent('WEB_SERVER', 'Nano Server', Server, { max_qps: 200, base_latency: 100, setup_cost: 50, operational_cost: 0.05 })}>
+                  <Plus size={14} /> Nano Server (0.2k QPS)
                 </button>
-                <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10 })}>
+                <button onClick={() => addComponent('WEB_SERVER', '標準伺服器', Server, { max_qps: 1000, base_latency: 50, setup_cost: 200, operational_cost: 0.2 })}>
+                  <Plus size={14} /> 標準伺服器 (1k QPS)
+                </button>
+                <button onClick={() => addComponent('WEB_SERVER', '高效能伺服器', Server, { max_qps: 5000, base_latency: 20, setup_cost: 800, operational_cost: 0.7 })}>
+                  <Plus size={14} /> 高效能伺服器 (5k QPS)
+                </button>
+                <button onClick={() => addComponent('AUTO_SCALING_GROUP', '彈性伸縮組 (ASG)', Layout, { max_qps: 1000, auto_scaling: true, max_replicas: 5, scale_up_threshold: 70, warmup_seconds: 10, operational_cost: 0.3 })}>
                   <Plus size={14} /> ASG (1k QPS/Node)
                 </button>
-                <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000 })}>
+                <button onClick={() => addComponent('LOAD_BALANCER', '負載平衡器', Share2, { max_qps: 20000, base_latency: 5, operational_cost: 0.1 })}>
                   <Plus size={14} /> 負載平衡器
                 </button>
                 <button onClick={() => addComponent('CDN', 'CDN (全球快取)', Globe, { max_qps: 50000 })}>
@@ -1045,8 +1058,14 @@ function Game() {
                 <button onClick={() => addComponent('WAF', 'WAF (防火牆)', Shield, { max_qps: 20000 })}>
                   <Plus size={14} /> WAF (防火牆)
                 </button>
-                <button onClick={() => addComponent('DATABASE', '資料庫', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0 })}>
-                  <Plus size={14} /> 資料庫
+                <button onClick={() => addComponent('DATABASE', '資料庫 (RDB)', Database, { max_qps: 500, replication_mode: 'SINGLE', slave_count: 0, base_latency: 50, operational_cost: 0.5 })}>
+                  <Plus size={14} /> 資料庫 (PostgreSQL)
+                </button>
+                <button onClick={() => addComponent('CACHE', 'Redis 快取', Database, { max_qps: 20000, base_latency: 1, operational_cost: 0.3 })}>
+                  <Plus size={14} /> Redis 快取
+                </button>
+                <button onClick={() => addComponent('MESSAGE_QUEUE', '訊息隊列', Database, { max_qps: 10000, base_latency: 200, operational_cost: 0.4 })}>
+                  <Plus size={14} /> Kafka 訊息隊列
                 </button>
                 <button onClick={() => addComponent('CACHE', 'Redis 快取', Activity, { max_qps: 10000 })}>
                   <Plus size={14} /> Redis 快取
