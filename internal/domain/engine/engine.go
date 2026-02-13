@@ -112,11 +112,20 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	// 最終實際流量
 	currentQPS = int64(float64(totalBaseQPS) * fluctuation * retentionRate)
+	
+	// 生成惡意流量 (Malicious QPS)
+	// 平時約 2% 髒流量，每 20 秒可能發生一次大型掃描 (高達 15%)
+	maliciousRatio := 0.02
+	if elapsedSeconds%20 < 4 {
+		maliciousRatio = 0.15
+	}
+	currentMaliciousQPS := int64(float64(currentQPS) * maliciousRatio)
 
 	// 4. 核心物理流量模擬：計算負載與截斷
 	visited := make(map[string]bool)
 	crashedNodes := make(map[string]bool)
 	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
+	compMaliciousLoads := make(map[string]int64)    // 紀錄組件收到的「惡意請求量」
 	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
 	compBacklogs := make(map[string]int64)          // 紀錄 MQ 等組件的積壓量
 
@@ -129,14 +138,15 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	var totalOperationalCost float64
 	var totalBaseLatency float64
 	var consistencyScore = 100.0
+	var securityIncidents float64 // 紀錄抵達敏感節點的惡意流量
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
 	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
 	// 目的：讓每個節點知道自己「將會」收到多少流量
 	passesInputLoad := make(map[string]int64)
 	
-	var calculateLoad func(string, int64, map[string]bool)
-	calculateLoad = func(id string, input int64, pathVisited map[string]bool) {
+	var calculateLoad func(string, int64, int64, map[string]bool)
+	calculateLoad = func(id string, input int64, malInput int64, pathVisited map[string]bool) {
 		if _, exists := compMap[id]; !exists {
 			return
 		}
@@ -149,38 +159,39 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 		newPathVisited[id] = true
 
-		passesInputLoad[id] += input
+		passesInputLoad[id] += (input + malInput) // 惡意流量同樣消耗資源
 
 		// 簡單分流預算傳遞
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
-			// Cache 邏輯在預算階段也要考慮嗎？
-			// 是的，因為 Cache 會減少往下游的「需求」。
 			comp := compMap[id]
 			output := input
+			malOutput := malInput
 			if comp.Type == component.Cache || comp.Type == component.CDN {
 				output = int64(float64(input) * 0.2)
 			}
+			// WAF 攔截邏輯
+			if comp.Type == component.WAF {
+				malOutput = int64(float64(malInput) * 0.1) // 攔截 90%
+			}
 			
 			split := output / downstreamCount
+			malSplit := malOutput / downstreamCount
 			for _, nextID := range adj[id] {
-				calculateLoad(nextID, split, newPathVisited)
+				calculateLoad(nextID, split, malSplit, newPathVisited)
 			}
 		}
 	}
 
 	for _, root := range roots {
-		// 初始流量也需要分流 logic? 
-		// 假設 TrafficSource 本身不消耗，直接往下傳
-		// 為了對齊，我們把 TrafficSource 當作一個透明節點
-		calculateLoad(root, currentQPS, make(map[string]bool))
+		calculateLoad(root, currentQPS, currentMaliciousQPS, make(map[string]bool))
 	}
 
 
 	// Pass 2: 實際流量傳播 (Actual Flow Propagation)
 	// 根據 Pass 1 的 total load 決定崩潰與截斷
-	var propagateFlow func(string, int64, map[string]bool)
-	propagateFlow = func(id string, input int64, pathVisited map[string]bool) {
+	var propagateFlow func(string, int64, int64, map[string]bool)
+	propagateFlow = func(id string, input int64, malInput int64, pathVisited map[string]bool) {
 		comp, exists := compMap[id]
 		if !exists {
 			return
@@ -205,7 +216,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		currentMaxQPS := baseMaxQPS
 
 		// 基礎開課成本 (Setup + Operational)
-		totalOperationalCost += comp.OperationalCost
+		compCost := comp.OperationalCost
+		if compCost == 0 {
+			// 預設維運成本
+			switch comp.Type {
+			case component.WAF: compCost = 0.15
+			case component.LoadBalancer: compCost = 0.1
+			case component.Database: compCost = 0.5
+			case component.Cache: compCost = 0.3
+			case component.WebServer: compCost = 0.2
+			}
+		}
+		totalOperationalCost += compCost
 
 		// 基礎延遲累積
 		if v, ok := comp.Properties["base_latency"].(float64); ok {
@@ -319,6 +341,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		}
 
 		visited[id] = true
+		compMaliciousLoads[id] += malInput
 		
 		// 截斷邏輯 (Capping)
 		// 這裡我們當前收到的是 input。
@@ -328,8 +351,19 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		// 實際處理流量 = input * factor
 		
 		actualProcessed := input
-		
-		// Message Queue 特殊邏輯：消峰填谷 (Buffering)
+		actualMalProcessed := malInput
+
+		// WAF 過濾與誤殺 (False Positives)
+		if comp.Type == component.WAF {
+			actualMalProcessed = int64(float64(malInput) * 0.1) // 攔截 90% 惡意流量
+			actualProcessed = int64(float64(input) * 0.98)      // 誤殺 2% 正面流量
+		}
+		// 安全事件判定
+		if comp.Type == component.Database && actualMalProcessed > 0 {
+			securityIncidents += float64(actualMalProcessed)
+		}
+
+		// Message Queue 特殊邏輯... (略)
 		if comp.Type == component.MessageQueue {
 			// 1. MQ 自身的 I/O 吞吐量限制
 			mqIoLimit := currentMaxQPS 
@@ -412,10 +446,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		downstreamCount := int64(len(adj[id]))
 		if downstreamCount > 0 {
 			splitQPS := outputQPS / downstreamCount
+			malSplit := actualMalProcessed / downstreamCount
 			for _, nextID := range adj[id] {
 				finalSplit := splitQPS
+				finalMalSplit := malSplit
 
-				// Message Queue PULL Mode: 限制輸出量到下游的最大容量，防止主動壓垮下游
 				if comp.Type == component.MessageQueue {
 					if mode, ok := comp.Properties["delivery_mode"].(string); ok && mode == "PULL" {
 						downstreamComp, exists := compMap[nextID]
@@ -428,25 +463,21 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					}
 				}
 
-				propagateFlow(nextID, finalSplit, newPathVisited)
+				propagateFlow(nextID, finalSplit, finalMalSplit, newPathVisited)
 			}
 		}
 	}
 
 	for _, root := range roots {
-		// Traffic Source 不受 MaxQPS 限制，也不會崩潰
-		// 直接傳遞完整流量
-		// 但我們還是要呼叫 propagateFlow 來觸發下游
-		// 這裡我們直接模擬分流傳給下游，避免 TrafficSource 本身被判定崩潰
-		// 或者簡單點：TrafficSource 的 maxQPS 是無限大
-		compLoads[root] = currentQPS
+		compLoads[root] = currentQPS + currentMaliciousQPS
 		visited[root] = true
 		
 		downstreamCount := int64(len(adj[root]))
 		if downstreamCount > 0 {
 			split := currentQPS / downstreamCount
+			malSplit := currentMaliciousQPS / downstreamCount
 			for _, nextID := range adj[root] {
-				propagateFlow(nextID, split, make(map[string]bool))
+				propagateFlow(nextID, split, malSplit, make(map[string]bool))
 			}
 		}
 	}
@@ -474,7 +505,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	if reliabilityScore > 100 { reliabilityScore = 100 }
 	if reliabilityScore < 0 { reliabilityScore = 0 }
 
-	totalScore := (successRate * 90.0) + (reliabilityScore * 0.1)
+	// 安全評分計算
+	securityScore := 100.0 - (securityIncidents * 0.5) // 每有一點惡意流量抵達 DB 扣 0.5 分
+	if securityScore < 0 { securityScore = 0 }
+
+	totalScore := (successRate * 70.0) + (reliabilityScore * 0.1) + (securityScore * 0.2)
 
 	// 延遲模擬
 	congestionFactor := 1.0
@@ -517,6 +552,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		{Dimension: "System Health", Value: totalScore, Comment: comment},
 		{Dimension: "Performance", Value: math.Max(0, 100-(avgLatency-100)/20), Comment: fmt.Sprintf("平均延遲: %.1f ms", avgLatency)},
 		{Dimension: "Reliability", Value: reliabilityScore, Comment: "基於冗餘設計與崩潰頻率的可靠性評分。"},
+		{Dimension: "Security", Value: securityScore, Comment: "抵達核心節點的惡意流量會降低安全性。"},
 		{Dimension: "Cost Efficiency", Value: costScore, Comment: fmt.Sprintf("每秒運維成本: $%.2f", totalOperationalCost)},
 		{Dimension: "Data Consistency", Value: consistencyScore, Comment: "快取或異步隊列會降低即時一致性。"},
 	}
@@ -550,6 +586,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		FulfilledQPS:            totalFulfilledQPS,
 		CostPerSec:              totalOperationalCost,
 		ComponentBacklogs:       compBacklogs,
+		SecurityScore:           securityScore,
+		ComponentMaliciousLoads: compMaliciousLoads,
 	}, nil
 }
 

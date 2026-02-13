@@ -33,6 +33,8 @@ type Result struct {
 	IsRandomDrop            bool             `json:"is_random_drop"`             // 是否處於隨機驟降狀態
 	FulfilledQPS            int64            `json:"fulfilled_qps"`              // 成功取得資料的 QPS
 	ComponentBacklogs       map[string]int64 `json:"component_backlogs"`         // 每個組件當前的訊息積壓量 (MQ 適用)
+	SecurityScore           float64          `json:"security_score"`             // 安全評分 (0-100)
+	ComponentMaliciousLoads map[string]int64 `json:"component_malicious_loads"` // 每個組件承載的惡意 QPS
 }
 
 // Engine 定義評估引擎的介面

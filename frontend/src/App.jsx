@@ -267,6 +267,11 @@ const CustomNode = ({ data, selected, id }) => {
                   {displayMaxQPS ? ` / ${displayMaxQPS}` : ''} QPS
                 </div>
               )}
+              {data.malicious_load > 0 && (
+                <div className="node-stats" style={{ borderTop: 'none', paddingTop: 0, color: '#ef4444', fontWeight: 'bold' }}>
+                  ☢ 惡意: {data.malicious_load.toFixed(0)} QPS
+                </div>
+              )}
               {data.type === 'MESSAGE_QUEUE' && (
                 <div className={`node-stats ${data.properties?.backlog > 0 ? 'limited' : ''}`} style={{ borderTop: 'none', paddingTop: 0 }}>
                   積壓: {Math.max(0, data.properties?.backlog || 0).toFixed(0)} Msg
@@ -640,6 +645,7 @@ function Game() {
           data: {
             ...node.data,
             load: isActiveNode ? nodeLoad : 0,
+            malicious_load: res.component_malicious_loads?.[node.id] || 0,
             active: isActiveNode,
             active_time: res.created_at, // 用於判斷暖機進度
             isBurstActive: res.is_burst_active,
