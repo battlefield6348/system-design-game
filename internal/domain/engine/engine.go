@@ -9,6 +9,11 @@ import (
 	"system-design-game/internal/domain/scenario"
 )
 
+// Engine 定義評估引擎的介面
+type Engine interface {
+	Evaluate(designID string, elapsedSeconds int64) (*evaluation.Result, error)
+}
+
 // SimpleEngine 是一個基礎的評估引擎實作
 type SimpleEngine struct {
 	designRepo   design.Repository
@@ -68,7 +73,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			} else if v, ok := comp.Properties["start_qps"].(int64); ok {
 				baseQPS = v
 			}
-			
+
 			// 處理突發流量 (Burst)
 			if burst, ok := comp.Properties["burst_traffic"].(bool); ok && burst {
 				// 每 10 秒會有一次 5 倍流量的突發，持續 3 秒
@@ -94,7 +99,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	if currentQPS <= 0 && len(s.Phases) > 0 {
 		currentQPS = s.Phases[len(s.Phases)-1].EndQPS
 	}
-	
+
 	// 加上使用者設定的初始流量
 	totalBaseQPS := currentQPS + baseQPS
 
@@ -120,11 +125,11 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 	// 最終實際流量
 	currentQPS = int64(float64(totalBaseQPS) * fluctuation * retentionRate)
-	
+
 	// 生成惡意流量 (Malicious QPS) - 改為突發事件模型 (DDOS 攻擊)
 	isAttackActive := false
 	currentMaliciousQPS := int64(0)
-	
+
 	enableAttacks := false
 	for _, root := range roots {
 		if v, ok := compMap[root].Properties["enable_attacks"].(bool); ok {
@@ -143,14 +148,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	// 4. 核心物理流量模擬：計算負載與截斷
 	visited := make(map[string]bool)
 	crashedNodes := make(map[string]bool)
-	compLoads := make(map[string]int64)             // 紀錄組件收到的「總輸入流量」
-	compReadLoads := make(map[string]int64)         // 紀錄組件收到的「讀取流量」
-	compWriteLoads := make(map[string]int64)        // 紀錄組件收到的「寫入流量」
-	compMaliciousLoads := make(map[string]int64)    // 紀錄組件收到的「惡意請求量」
-	compEffectiveMaxQPS := make(map[string]int64)   // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
-	compBacklogs := make(map[string]int64)          // 紀錄 MQ 等組件的積壓量
-	compCPUUsage := make(map[string]float64)       // 紀錄組件 CPU 使用率
-	compRAMUsage := make(map[string]float64)       // 紀錄組件 RAM 使用率
+	compLoads := make(map[string]int64)           // 紀錄組件收到的「總輸入流量」
+	compReadLoads := make(map[string]int64)       // 紀錄組件收到的「讀取流量」
+	compWriteLoads := make(map[string]int64)      // 紀錄組件收到的「寫入流量」
+	compMaliciousLoads := make(map[string]int64)  // 紀錄組件收到的「惡意請求量」
+	compEffectiveMaxQPS := make(map[string]int64) // 紀錄組件當前的「有效最大處理能力」(含 Auto Scaling)
+	compBacklogs := make(map[string]int64)        // 紀錄 MQ 等組件的積壓量
+	compCPUUsage := make(map[string]float64)      // 紀錄組件 CPU 使用率
+	compRAMUsage := make(map[string]float64)      // 紀錄組件 RAM 使用率
 
 	compReplicas := make(map[string]int)
 	for _, c := range d.Components {
@@ -174,13 +179,13 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	var totalBaseLatency float64
 	var consistencyScore = 100.0
 	var securityIncidents float64 // 紀錄抵達敏感節點的惡意流量
-	var warnings []string          // 收集架構警告訊息
+	var warnings []string         // 收集架構警告訊息
 
 	// Pass 1: 計算潛在總負載 (Potential Load)
 	// 這一步只累加流量，不進行截斷，也不觸發崩潰邏輯
 	// 目的：讓每個節點知道自己「將會」收到多少流量
 	passesInputLoad := make(map[string]int64)
-	
+
 	var calculateLoad func(string, int64, int64, int64, map[string]bool)
 	calculateLoad = func(id string, read, write, mal int64, pathVisited map[string]bool) {
 		comp, exists := compMap[id]
@@ -201,18 +206,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		downstreamEdges := adj[id]
 		if len(downstreamEdges) > 0 {
 			outRead, outWrite := read, write
-			
+
 			// 快取/CDN 特性：讀取會被攔截 (Hit)，寫入會穿透 (Pass-through)
 			if comp.Type == component.Cache || comp.Type == component.CDN {
 				outRead = int64(float64(read) * 0.2) // 假設 80% Cache Hit
-				outWrite = write                      // 寫入 100% 穿透
+				outWrite = write                     // 寫入 100% 穿透
 			}
-			
+
 			malOutput := int64(float64(mal) * 1.0)
 			if comp.Type == component.WAF {
 				malOutput = int64(float64(mal) * 0.1)
 			}
-			
+
 			// 計算接受讀取和寫入的連線數量
 			readTargets := 0
 			writeTargets := 0
@@ -235,7 +240,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				}
 				// 惡意流量均分給所有連線
 				mSplit = malOutput / int64(len(downstreamEdges))
-				
+
 				calculateLoad(edge.ToID, rSplit, wSplit, mSplit, newPathVisited)
 			}
 		}
@@ -245,7 +250,6 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		calculateLoad(root, currentReadQPS, currentWriteQPS, currentMaliciousQPS, make(map[string]bool))
 	}
 
-
 	// Pass 2: 實際流量傳播 (Actual Flow Propagation)
 	var propagateFlow func(string, int64, int64, int64, map[string]bool)
 	propagateFlow = func(id string, read, write, mal int64, pathVisited map[string]bool) {
@@ -253,7 +257,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		if !exists {
 			return
 		}
-		
+
 		if pathVisited[id] {
 			return
 		}
@@ -277,13 +281,20 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		if compCost == 0 {
 			// 預設維運成本
 			switch comp.Type {
-			case component.WAF: compCost = 0.15
-			case component.LoadBalancer: compCost = 0.1
-			case component.Database: compCost = 0.5
-			case component.Cache: compCost = 0.3
-			case component.WebServer: compCost = 0.2
-			case component.APIGateway: compCost = 0.15
-			case component.NoSQL: compCost = 0.4
+			case component.WAF:
+				compCost = 0.15
+			case component.LoadBalancer:
+				compCost = 0.1
+			case component.Database:
+				compCost = 0.5
+			case component.Cache:
+				compCost = 0.3
+			case component.WebServer:
+				compCost = 0.2
+			case component.APIGateway:
+				compCost = 0.15
+			case component.NoSQL:
+				compCost = 0.4
 			}
 		}
 		totalOperationalCost += compCost
@@ -304,7 +315,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				totalBaseLatency += 50.0
 			case component.MessageQueue:
 				totalBaseLatency += 200.0 // MQ 的非同步延遲代價
-				consistencyScore -= 5.0    // MQ 引入最終一致性風險
+				consistencyScore -= 5.0   // MQ 引入最終一致性風險
 			case component.Cache, component.CDN:
 				totalBaseLatency += 2.0
 				consistencyScore -= 10.0 // Cache 引入資料不一致風險
@@ -332,7 +343,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				if v, ok := comp.Properties["max_replicas"].(float64); ok {
 					maxReplicas = int(v)
 				}
-				
+
 				threshold := 70.0 // 預設 70% 資源使用率就擴展
 				if v, ok := comp.Properties["scale_up_threshold"].(float64); ok {
 					threshold = v
@@ -355,26 +366,28 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				if startTimes, ok := comp.Properties["replica_start_times"].([]interface{}); ok {
 					for _, tObj := range startTimes {
 						startTime := int64(tObj.(float64))
-						if elapsedSeconds - startTime >= warmup {
+						if elapsedSeconds-startTime >= warmup {
 							activeCount++
 						} else {
 							bootingCount++
 						}
 					}
 				}
-				
+
 				// 確保至少有一台基礎機器
-				if activeCount < 1 { activeCount = 1 }
+				if activeCount < 1 {
+					activeCount = 1
+				}
 
 				// 計算當前單機的資源使用率
 				effectiveResourceLoad := float64(read) + float64(write)*4.0 // 寫入加權
 				currentCPUUsage := 0.0
 				currentRAMUsage := 0.0
-				
+
 				if baseMaxQPS > 0 {
 					// CPU 使用率計算
 					currentCPUUsage = math.Min(100.0, 10.0+(effectiveResourceLoad/float64(baseMaxQPS)/float64(activeCount))*90.0)
-					
+
 					// RAM 使用率計算（簡化版）
 					currentRAMUsage = math.Min(100.0, 20.0+(float64(potentialTotalLoad)/float64(baseMaxQPS)/float64(activeCount))*60.0)
 				}
@@ -436,7 +449,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			crashedNodes[id] = true
 			return // 崩潰，流量在此斷掉
 		}
-		
+
 		// --- 資源消耗計算 ---
 		// CPU 消耗：與負載成正比，100% 負荷代表達到處理上限
 		cpu := 10.0 // 基礎 CPU 消耗 (Idle)
@@ -456,7 +469,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		// RAM 消耗：不同組件有不同特性
 		ram := 15.0 // 基礎 RAM 消耗
-		
+
 		// 為了計算準確，ASG 類型的 RAM 也是算單機平均
 		effectiveLoadForRAM := float64(potentialTotalLoad)
 		effectiveMaxForRAM := float64(currentMaxQPS)
@@ -478,12 +491,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		case component.MessageQueue:
 			// MQ 組件：RAM 隨積壓量 (Backlog) 增加
 			prevBacklog := int64(0)
-			if v, ok := comp.Properties["backlog"].(float64); ok { prevBacklog = int64(v) }
+			if v, ok := comp.Properties["backlog"].(float64); ok {
+				prevBacklog = int64(v)
+			}
 			ram += (float64(prevBacklog) / 50000.0) * 80.0 // 假設 5萬筆積壓會爆 RAM
 		case component.Worker:
 			// Worker: 記憶體消耗較高，與負載相關
 			if effectiveMaxForRAM > 0 {
-				ram += 20.0 + (effectiveLoadForRAM / effectiveMaxForRAM) * 40.0
+				ram += 20.0 + (effectiveLoadForRAM/effectiveMaxForRAM)*40.0
 			}
 		case component.VideoTranscoding:
 			// 影片轉碼：極高 CPU 和中等 RAM 消耗
@@ -494,13 +509,13 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 			// RAM: 需要載入影片到記憶體
 			if effectiveMaxForRAM > 0 {
-				ram += 30.0 + (effectiveLoadForRAM / effectiveMaxForRAM) * 40.0
+				ram += 30.0 + (effectiveLoadForRAM/effectiveMaxForRAM)*40.0
 			}
 		case component.Database, component.NoSQL:
-			ram += 30.0 + (effectiveLoadForRAM / 10000.0) * 20.0
+			ram += 30.0 + (effectiveLoadForRAM/10000.0)*20.0
 		case component.ExternalAPI:
 			// 外部 API 不佔我們自己的資源，基礎佔用極低
-			ram = 5.0 
+			ram = 5.0
 			cpu = 2.0
 		default:
 			if effectiveMaxForRAM > 0 {
@@ -520,7 +535,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 
 		visited[id] = true
 		compMaliciousLoads[id] += mal
-		
+
 		// 截斷邏輯 (Capping)
 		actualRead := read
 		actualWrite := write
@@ -532,7 +547,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			actualRead = int64(float64(read) * 0.98)
 			actualWrite = int64(float64(write) * 0.98)
 		}
-		
+
 		// 外部 API 特定邏輯：模擬 SLA 丟包與按量計費
 		if comp.Type == component.ExternalAPI {
 			sla := 0.99
@@ -541,14 +556,14 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 			actualRead = int64(float64(actualRead) * sla)
 			actualWrite = int64(float64(actualWrite) * sla)
-			
+
 			// 額外計費：模擬第三方服務按量收費 (例如每 1000 請求 $0.1)
 			totalOperationalCost += float64(actualRead+actualWrite) * 0.0001
 		}
-		
+
 		// 資源放大效應：寫入操作通常比讀取消耗多 3-5 倍 CPU
 		effectiveResourceLoad := float64(actualRead) + float64(actualWrite)*4.0
-		
+
 		// 重新計算 CPU (考慮寫入加權)
 		if currentMaxQPS > 0 {
 			compCPUUsage[id] = math.Min(100.0, 10.0+(effectiveResourceLoad/float64(currentMaxQPS))*90.0)
@@ -564,7 +579,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 				}
 			}
 			threat := float64(actualMalProcessed)
-			if isProtected { threat *= 0.5 }
+			if isProtected {
+				threat *= 0.5
+			}
 			securityIncidents += threat
 		}
 
@@ -574,8 +591,8 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		// Message Queue 特殊邏輯... (略)
 		if comp.Type == component.MessageQueue {
 			// 1. MQ 自身的 I/O 吞吐量限制
-			mqIoLimit := currentMaxQPS 
-			
+			mqIoLimit := currentMaxQPS
+
 			// 2. 下游消費者的總處理能力 (Consumer-Driven)
 			downstreamCapacity := int64(0)
 			for _, edge := range adj[id] {
@@ -618,7 +635,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 			// MQ 比例縮減讀寫
 			ratio := 1.0
-			if attemptLoad > 0 { ratio = float64(actualProcessed) / float64(attemptLoad) }
+			if attemptLoad > 0 {
+				ratio = float64(actualProcessed) / float64(attemptLoad)
+			}
 			actualRead = int64(float64(read) * ratio)
 			actualWrite = int64(float64(write) * ratio)
 
@@ -626,7 +645,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			if effectiveProcessingRate > 0 {
 				queuingDelay = (float64(compBacklogs[id]) / float64(effectiveProcessingRate)) * 1000.0
 			}
-			
+
 			// 更新顯示用的有效 MaxQPS
 			compEffectiveMaxQPS[id] = effectiveProcessingRate
 		} else {
@@ -638,7 +657,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			actualProcessed = actualRead + actualWrite
 		}
 		totalBaseLatency += queuingDelay
-		
+
 		// componentProcessedQPS[id] += actualProcessed // 如果需要統計實際處理量
 
 		// 計算「成功取得資料」
@@ -651,7 +670,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			if mode, ok := comp.Properties["replication_mode"].(string); ok && mode == "SLAVE" {
 				isSlave = true
 			}
-			
+
 			fulfilledRead = actualRead
 			if !isSlave {
 				fulfilledWrite = actualWrite
@@ -669,17 +688,17 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		downstreamEdges := adj[id]
 		if len(downstreamEdges) > 0 {
 			outRead, outWrite := actualRead, actualWrite
-			
+
 			// 快閃命中：扣除已被快取攔截的「讀取」流量
 			if comp.Type == component.Cache || comp.Type == component.CDN {
-				outRead = int64(float64(actualRead) * 0.2) 
+				outRead = int64(float64(actualRead) * 0.2)
 			}
-			
+
 			malOutput := int64(float64(actualMalProcessed) * 1.0)
 			if comp.Type == component.WAF {
 				malOutput = int64(float64(actualMalProcessed) * 0.1)
 			}
-			
+
 			// 計算接受讀取和寫入的連線數量
 			readTargets := 0
 			writeTargets := 0
@@ -730,7 +749,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		compReadLoads[root] = currentReadQPS
 		compWriteLoads[root] = currentWriteQPS
 		visited[root] = true
-		
+
 		downstreamEdges := adj[root]
 		if len(downstreamEdges) > 0 {
 			// 同樣需要計算分流
@@ -754,7 +773,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 					wSplit = currentWriteQPS / int64(writeTargets)
 				}
 				mSplit = currentMaliciousQPS / int64(len(downstreamEdges))
-				
+
 				propagateFlow(edge.ToID, rSplit, wSplit, mSplit, make(map[string]bool))
 			}
 		}
@@ -780,12 +799,18 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 	}
-	if reliabilityScore > 100 { reliabilityScore = 100 }
-	if reliabilityScore < 0 { reliabilityScore = 0 }
+	if reliabilityScore > 100 {
+		reliabilityScore = 100
+	}
+	if reliabilityScore < 0 {
+		reliabilityScore = 0
+	}
 
 	// 安全評分計算
 	securityScore := 100.0 - (securityIncidents * 0.5) // 每有一點惡意流量抵達 DB 扣 0.5 分
-	if securityScore < 0 { securityScore = 0 }
+	if securityScore < 0 {
+		securityScore = 0
+	}
 
 	totalScore := (successRate * 70.0) + (reliabilityScore * 0.1) + (securityScore * 0.2)
 
@@ -801,7 +826,7 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 			}
 		}
 	}
-	
+
 	// 原有的排隊延遲邏輯 (基於 QPS/MaxQPS)
 	for id, load := range compLoads {
 		maxQPS := compEffectiveMaxQPS[id]
@@ -837,7 +862,9 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 		costScore = math.Max(0, 100.0-(totalOperationalCost-budget)*5)
 	}
 
-	if consistencyScore < 0 { consistencyScore = 0 }
+	if consistencyScore < 0 {
+		consistencyScore = 0
+	}
 
 	comment := "系統穩定運行中。"
 	if successRate < 0.1 {
@@ -865,35 +892,35 @@ func (e *SimpleEngine) Evaluate(designID string, elapsedSeconds int64) (*evaluat
 	}
 
 	return &evaluation.Result{
-		DesignID:            designID,
-		ScenarioID:          d.ScenarioID,
-		TotalScore:          totalScore,
-		Scores:              scores,
-		Passed:              totalScore >= 95.0,
-		AvgLatencyMS:        avgLatency,
+		DesignID:                 designID,
+		ScenarioID:               d.ScenarioID,
+		TotalScore:               totalScore,
+		Scores:                   scores,
+		Passed:                   totalScore >= 95.0,
+		AvgLatencyMS:             avgLatency,
 		TotalReadQPS:             currentReadQPS,
 		TotalWriteQPS:            currentWriteQPS,
-		CreatedAt:           elapsedSeconds,
-		ActiveComponentIDs:  activeIDs,
-		CrashedComponentIDs: crashedIDs,
+		CreatedAt:                elapsedSeconds,
+		ActiveComponentIDs:       activeIDs,
+		CrashedComponentIDs:      crashedIDs,
 		ComponentLoads:           compLoads,
 		ComponentEffectiveMaxQPS: compEffectiveMaxQPS,
-		IsBurstActive:           isBurstActive,
-		IsAttackActive:          isAttackActive,
-		ComponentReplicas:       compReplicas,
-		RetentionRate:           retentionRate,
-		IsRandomDrop:            isRandomDrop,
+		IsBurstActive:            isBurstActive,
+		IsAttackActive:           isAttackActive,
+		ComponentReplicas:        compReplicas,
+		RetentionRate:            retentionRate,
+		IsRandomDrop:             isRandomDrop,
 		TotalQPS:                 currentQPS,
-		FulfilledQPS:            totalFulfilledQPS,
-		CostPerSec:              totalOperationalCost,
-		ComponentBacklogs:       compBacklogs,
-		SecurityScore:           securityScore,
-		ComponentMaliciousLoads: compMaliciousLoads,
-		ComponentCPUUsage:       compCPUUsage,
-		ComponentRAMUsage:       compRAMUsage,
-		ComponentReadLoads:      compReadLoads,
-		ComponentWriteLoads:     compWriteLoads,
-		Warnings:                warnings,
+		FulfilledQPS:             totalFulfilledQPS,
+		CostPerSec:               totalOperationalCost,
+		ComponentBacklogs:        compBacklogs,
+		SecurityScore:            securityScore,
+		ComponentMaliciousLoads:  compMaliciousLoads,
+		ComponentCPUUsage:        compCPUUsage,
+		ComponentRAMUsage:        compRAMUsage,
+		ComponentReadLoads:       compReadLoads,
+		ComponentWriteLoads:      compWriteLoads,
+		Warnings:                 warnings,
 	}, nil
 }
 

@@ -16,33 +16,33 @@ type Result struct {
 	Passed     bool    `json:"passed"`
 
 	// 運行時指標 (Endless mode)
-	AvgLatencyMS float64 `json:"avg_latency_ms"`
-	ErrorRate    float64 `json:"error_rate"`
-	TotalQPS     int64   `json:"total_qps"`
+	AvgLatencyMS  float64 `json:"avg_latency_ms"`
+	ErrorRate     float64 `json:"error_rate"`
+	TotalQPS      int64   `json:"total_qps"`
 	TotalReadQPS  int64   `json:"total_read_qps"`
 	TotalWriteQPS int64   `json:"total_write_qps"`
-	CostPerSec   float64 `json:"cost_per_sec"`
+	CostPerSec    float64 `json:"cost_per_sec"`
 	RevenuePerSec float64 `json:"revenue_per_sec"`
 
-	CreatedAt           int64            `json:"created_at"`
-	ActiveComponentIDs  []string         `json:"active_component_ids"`  // 實際有接收到流量的組件 ID
-	CrashedComponentIDs []string         `json:"crashed_component_ids"` // 已經掛掉的組件 ID
-	ComponentLoads      map[string]int64 `json:"component_loads"`       // 每個組件具體承擔的 QPS
-	ComponentEffectiveMaxQPS map[string]int64 `json:"component_effective_max_qps"` // 每個組件當前有效最大 QPS
-	IsBurstActive           bool             `json:"is_burst_active"`            // 當前是否處於突發流量狀態
-	IsAttackActive          bool             `json:"is_attack_active"`           // 當前是否處於遭受惡意攻擊狀態
-	ComponentReplicas       map[string]int   `json:"component_replicas"`         // 每個組件當前的副本數
-	RetentionRate           float64          `json:"retention_rate"`             // 當前使用者留存率 (0.0 - 1.0)
-	IsRandomDrop            bool             `json:"is_random_drop"`             // 是否處於隨機驟降狀態
-	FulfilledQPS            int64            `json:"fulfilled_qps"`              // 成功取得資料的 QPS
-	ComponentBacklogs       map[string]int64 `json:"component_backlogs"`         // 每個組件當前的訊息積壓量 (MQ 適用)
-	SecurityScore           float64          `json:"security_score"`             // 安全評分 (0-100)
-	ComponentMaliciousLoads map[string]int64 `json:"component_malicious_loads"` // 每個組件承載的惡意 QPS
-	ComponentCPUUsage       map[string]float64 `json:"component_cpu_usage"`       // 每個組件的 CPU 使用率 (0-100)
-	ComponentRAMUsage       map[string]float64 `json:"component_ram_usage"`       // 每個組件的 RAM 使用率 (0-100)
-	ComponentReadLoads      map[string]int64   `json:"component_read_loads"`      // 每個組件的讀取 QPS
-	ComponentWriteLoads     map[string]int64   `json:"component_write_loads"`     // 每個組件的寫入 QPS
-	Warnings                []string           `json:"warnings"`                  // 架構警告訊息（如：Slave 收到寫入流量）
+	CreatedAt                int64              `json:"created_at"`
+	ActiveComponentIDs       []string           `json:"active_component_ids"`        // 實際有接收到流量的組件 ID
+	CrashedComponentIDs      []string           `json:"crashed_component_ids"`       // 已經掛掉的組件 ID
+	ComponentLoads           map[string]int64   `json:"component_loads"`             // 每個組件具體承擔的 QPS
+	ComponentEffectiveMaxQPS map[string]int64   `json:"component_effective_max_qps"` // 每個組件當前有效最大 QPS
+	IsBurstActive            bool               `json:"is_burst_active"`             // 當前是否處於突發流量狀態
+	IsAttackActive           bool               `json:"is_attack_active"`            // 當前是否處於遭受惡意攻擊狀態
+	ComponentReplicas        map[string]int     `json:"component_replicas"`          // 每個組件當前的副本數
+	RetentionRate            float64            `json:"retention_rate"`              // 當前使用者留存率 (0.0 - 1.0)
+	IsRandomDrop             bool               `json:"is_random_drop"`              // 是否處於隨機驟降狀態
+	FulfilledQPS             int64              `json:"fulfilled_qps"`               // 成功取得資料的 QPS
+	ComponentBacklogs        map[string]int64   `json:"component_backlogs"`          // 每個組件當前的訊息積壓量 (MQ 適用)
+	SecurityScore            float64            `json:"security_score"`              // 安全評分 (0-100)
+	ComponentMaliciousLoads  map[string]int64   `json:"component_malicious_loads"`   // 每個組件承載的惡意 QPS
+	ComponentCPUUsage        map[string]float64 `json:"component_cpu_usage"`         // 每個組件的 CPU 使用率 (0-100)
+	ComponentRAMUsage        map[string]float64 `json:"component_ram_usage"`         // 每個組件的 RAM 使用率 (0-100)
+	ComponentReadLoads       map[string]int64   `json:"component_read_loads"`        // 每個組件的讀取 QPS
+	ComponentWriteLoads      map[string]int64   `json:"component_write_loads"`       // 每個組件的寫入 QPS
+	Warnings                 []string           `json:"warnings"`                    // 架構警告訊息（如：Slave 收到寫入流量）
 }
 
 // Engine 定義評估引擎的介面

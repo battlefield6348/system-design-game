@@ -4,22 +4,22 @@ package component
 type Type string
 
 const (
-	TrafficSource Type = "TRAFFIC_SOURCE"
-	LoadBalancer  Type = "LOAD_BALANCER"
-	WebServer     Type = "WEB_SERVER"
-	Database      Type = "DATABASE"
-	Cache         Type = "CACHE"
-	MessageQueue  Type = "MESSAGE_QUEUE"
-	CDN           Type = "CDN"
-	WAF           Type = "WAF"
-	ObjectStorage Type = "OBJECT_STORAGE"
-	SearchEngine  Type = "SEARCH_ENGINE"
-	AutoScalingGroup  Type = "AUTO_SCALING_GROUP"
-	APIGateway        Type = "API_GATEWAY"
-	NoSQL             Type = "NOSQL"
-	Worker            Type = "WORKER"
-	VideoTranscoding  Type = "VIDEO_TRANSCODING"
-	ExternalAPI       Type = "EXTERNAL_API"
+	TrafficSource    Type = "TRAFFIC_SOURCE"
+	LoadBalancer     Type = "LOAD_BALANCER"
+	WebServer        Type = "WEB_SERVER"
+	Database         Type = "DATABASE"
+	Cache            Type = "CACHE"
+	MessageQueue     Type = "MESSAGE_QUEUE"
+	CDN              Type = "CDN"
+	WAF              Type = "WAF"
+	ObjectStorage    Type = "OBJECT_STORAGE"
+	SearchEngine     Type = "SEARCH_ENGINE"
+	AutoScalingGroup Type = "AUTO_SCALING_GROUP"
+	APIGateway       Type = "API_GATEWAY"
+	NoSQL            Type = "NOSQL"
+	Worker           Type = "WORKER"
+	VideoTranscoding Type = "VIDEO_TRANSCODING"
+	ExternalAPI      Type = "EXTERNAL_API"
 )
 
 // Component 代表系統中的一個最小單位

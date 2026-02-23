@@ -12,7 +12,7 @@ type Scenario struct {
 
 // Goal 定義關卡目標
 type Goal struct {
-	MinQPS        int64   `json:"min_qps"`
+	MinQPS       int64   `json:"min_qps"`
 	MaxLatencyMS int64   `json:"max_latency_ms"`
 	Availability float64 `json:"availability"`
 	Duration     int     `json:"duration"` // 測試需要持續多久（秒）
@@ -20,7 +20,7 @@ type Goal struct {
 
 // TrafficPhase 定義流量成長的一個階段
 type TrafficPhase struct {
-	Name            string `json:"name"`            // 階段名稱，如 "Normal", "Viral", "DDoS"
+	Name            string `json:"name"`             // 階段名稱，如 "Normal", "Viral", "DDoS"
 	StartQPS        int64  `json:"start_qps"`        // 階段起始 QPS
 	EndQPS          int64  `json:"end_qps"`          // 階段結束 QPS (可用於模擬指數或線性增長)
 	DurationSeconds int    `json:"duration_seconds"` // 該階段持續秒數

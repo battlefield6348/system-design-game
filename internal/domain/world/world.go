@@ -2,12 +2,12 @@ package world
 
 // GameState 代表玩家目前的遊戲狀態（無盡模式核心）
 type GameState struct {
-	PlayerID    string  `json:"player_id"`
-	Balance     float64 `json:"balance"`      // 目前的金幣/預算
-	TotalUsers  int64   `json:"total_users"`  // 累積獲得的使用者
+	PlayerID     string  `json:"player_id"`
+	Balance      float64 `json:"balance"`       // 目前的金幣/預算
+	TotalUsers   int64   `json:"total_users"`   // 累積獲得的使用者
 	SystemHealth float64 `json:"system_health"` // 0-100，根據延遲與錯誤率計算
-	Uptime      int64   `json:"uptime"`       // 系統總運行秒數
-	LastTick    int64   `json:"last_tick"`    // 上次計算的時間戳
+	Uptime       int64   `json:"uptime"`        // 系統總運行秒數
+	LastTick     int64   `json:"last_tick"`     // 上次計算的時間戳
 }
 
 // UpdateMetrics 根據當前系統表現更新遊戲狀態

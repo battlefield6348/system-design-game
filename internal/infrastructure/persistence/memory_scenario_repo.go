@@ -24,7 +24,7 @@ func (r *InMemScenarioRepository) initMockData() {
 		Title:       "短網址系統 (TinyURL)",
 		Description: "設計一個高讀取的短網址系統。挑戰：在極低預算下處理 100k 的跳轉請求，必須善用 Cache。",
 		Goal: scenario.Goal{
-			MinQPS:        100000,
+			MinQPS:       100000,
 			MaxLatencyMS: 50,
 			Availability: 99.9,
 			Duration:     300,
@@ -42,7 +42,7 @@ func (r *InMemScenarioRepository) initMockData() {
 		Title:       "快閃搶購 (Flash Sale)",
 		Description: "雙 11 搶購活動。挑戰：在 10 秒內應對從 0 到 500k 的突發流量，需使用 MQ 消峰填谷。",
 		Goal: scenario.Goal{
-			MinQPS:        500000,
+			MinQPS:       500000,
 			MaxLatencyMS: 500,
 			Availability: 95.0,
 			Duration:     60,
@@ -62,7 +62,7 @@ func (r *InMemScenarioRepository) initMockData() {
 		Title:       "影音串流 (Netflix/YouTube)",
 		Description: "全球化的影音平台。挑戰：降低跨國延遲，提升內容分發效率，需善用 CDN 與 Object Storage。",
 		Goal: scenario.Goal{
-			MinQPS:        50000,
+			MinQPS:       50000,
 			MaxLatencyMS: 20,
 			Availability: 99.99,
 			Duration:     600,
@@ -80,7 +80,7 @@ func (r *InMemScenarioRepository) initMockData() {
 		Title:       "自由沙盒 (Sandbox Mode)",
 		Description: "無目標限制的無盡模式。流量會隨時間持續緩慢增長，適合用來測試任何瘋狂的架構想法。",
 		Goal: scenario.Goal{
-			MinQPS:        1,
+			MinQPS:       1,
 			MaxLatencyMS: 5000,
 			Availability: 0.5,
 			Duration:     3600,

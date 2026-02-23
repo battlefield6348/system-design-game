@@ -12,14 +12,14 @@ type Connection struct {
 
 // Design 代表玩家設計的完整系統拓撲
 type Design struct {
-	ID          string                 `json:"id"`
-	PlayerID    string                 `json:"player_id"`
-	ScenarioID  string                 `json:"scenario_id"`
+	ID          string                `json:"id"`
+	PlayerID    string                `json:"player_id"`
+	ScenarioID  string                `json:"scenario_id"`
 	Components  []component.Component `json:"components"`
-	Connections []Connection           `json:"connections"`
-	Properties  component.Metadata     `json:"properties"` // 全域屬性，如：使用者留存率
-	CreatedAt   int64                  `json:"created_at"`
-	UpdatedAt   int64                  `json:"updated_at"`
+	Connections []Connection          `json:"connections"`
+	Properties  component.Metadata    `json:"properties"` // 全域屬性，如：使用者留存率
+	CreatedAt   int64                 `json:"created_at"`
+	UpdatedAt   int64                 `json:"updated_at"`
 }
 
 // Repository 定義 Design 的持久化介面
